@@ -148,9 +148,11 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="thread_utils.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="db_functions.h" />
+    <ClInclude Include="ebr.h" />
     <ClInclude Include="game_header.h" />
     <ClInclude Include="include\lauxlib.h" />
     <ClInclude Include="include\lua.h" />
