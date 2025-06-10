@@ -3,7 +3,7 @@
 #include "session.h"
 #include "overlapped.h"
 
-using SessionPtr = std::shared_ptr<Session>;
+using SessionPtr = Session*;
 
 enum TIMER_EVENT_TYPE { EV_RANDOM_MOVE };
 enum DB_EVENT_TYPE { 
@@ -35,6 +35,8 @@ public:
 public:
     bool is_pc(int32_t id);
     bool is_npc(int32_t id);
+    bool is_dummy_client(std::string_view name);
+    bool is_in_map_area(int16_t x, int16_t y);
 
     SessionPtr get_session(int32_t session_id);
     bool can_see(int32_t from, int32_t to);
@@ -63,7 +65,7 @@ private:
     OverExp _accept_over{ };
 
     std::atomic_int32_t _new_client_id{ 0 };
-    Concurrency::concurrent_unordered_map<int32_t, std::atomic<SessionPtr>> _sessions{ };
+    Concurrency::concurrent_unordered_map<int32_t, SessionPtr> _sessions{ };
     concurrency::concurrent_priority_queue<TIMER_EVENT> _timer_queue;
     //concurrency::concurrent_queue<DB_EVENT> _db_queue;
 };

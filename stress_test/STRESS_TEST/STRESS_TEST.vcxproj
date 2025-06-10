@@ -131,8 +131,9 @@
     <ClCompile Include="NetworkModule.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\SERVER\SERVER\protocol.h" />
+    <ClInclude Include="game_header.h" />
     <ClInclude Include="NetworkModule.h" />
+    <ClInclude Include="network_constants.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

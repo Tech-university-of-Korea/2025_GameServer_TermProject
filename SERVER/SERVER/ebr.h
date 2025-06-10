@@ -3,6 +3,8 @@
 #include <atomic>
 #include <thread>
 
+#define DEBUG_PRINT
+
 using ThreadIdType = int32_t;
 using EpochNumType = uint64_t;
 using EpochCounter = std::atomic<EpochNumType>;
@@ -15,8 +17,8 @@ inline constexpr size_t MIN_ARRAY_ALIGN_SIZE = CACHE_LINE_SIZE / sizeof(T);
 
 template <typename T>
 concept HasEpochCount = requires(T t) {
-    t.mEpochCount;
-    { t.mEpochCount } -> std::same_as<EpochNumType>;
+    t._epoch_counter;
+    { t._epoch_counter } -> std::same_as<EpochNumType>;
 };
 
 template <typename T>
@@ -29,7 +31,7 @@ public:
     ~EBR() { clear_thread_epoch(); }
 
 public:
-    EpochNumType GetCurrEpochCount() const {
+    EpochNumType get_curr_epoch_count() const {
         return _epoch_counter;
     }
 
@@ -62,7 +64,7 @@ public:
         _free_queue.push(ptr);
     }
 
-    template <typename... Args> /*requires std::is_constructible<Args..., T>*/
+    template <typename... Args> requires std::is_constructible_v<T, Args...>
     T* pop_ptr(Args&&... args) {
         if (true == _free_queue.empty()) {
             return new T{ std::forward<Args>(args)... };
@@ -70,12 +72,16 @@ public:
 
         auto ptr = _free_queue.front();
         for (size_t i = 0; i < MAX_THREAD * ALIGN_SIZE; i += ALIGN_SIZE) {
-            if (_epoch_array[i] != 0 && _epoch_array[i] < ptr->mEpochCount) {
+            if (_epoch_array[i] != 0 && _epoch_array[i] < ptr->_epoch_counter) {
                 return new T{ std::forward<Args>(args)... };
             }
         }
 
         _free_queue.pop();
+
+#ifdef DEBUG_PRINT
+        std::cout << "Reuse Session Pointer\n";
+#endif
 
         std::destroy_at(ptr);
         ptr = new(ptr) T{ std::forward<Args>(args)... };
@@ -89,4 +95,26 @@ public:
 private:
     EpochCounter _epoch_counter{ };
     const std::unique_ptr<EpochCounter[]> _epoch_array;
+};
+
+template <typename T>
+class EBRGuard {
+public:
+    EBRGuard() = delete;
+    EBRGuard(const EBRGuard&) = delete;
+    EBRGuard(EBRGuard&&) = delete;
+    EBRGuard& operator=(const EBRGuard&) = delete;
+    EBRGuard& operator=(EBRGuard&&) = delete;
+
+    EBRGuard(EBR<T>& ebr, const int32_t thread_id) : _ebr{ ebr }, _thread_id{ thread_id } {
+        _ebr.begin_epoch(_thread_id);
+    }
+
+    ~EBRGuard() {
+        _ebr.end_epoch(_thread_id);
+    }
+
+private:
+    const int32_t _thread_id;
+    EBR<T>& _ebr;
 };

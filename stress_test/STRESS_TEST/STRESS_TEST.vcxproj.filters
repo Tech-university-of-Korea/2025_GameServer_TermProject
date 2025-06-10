@@ -26,7 +26,10 @@
     <ClInclude Include="NetworkModule.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\SERVER\SERVER\protocol.h">
+    <ClInclude Include="game_header.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="network_constants.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>

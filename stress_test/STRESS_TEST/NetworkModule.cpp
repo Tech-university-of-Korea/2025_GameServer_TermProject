@@ -27,7 +27,8 @@ const static int MAX_BUFF_SIZE = 255;
 
 #pragma comment (lib, "ws2_32.lib")
 
-#include "..\..\SERVER\SERVER\protocol.h"
+#include "game_header.h"
+#include "network_constants.h"
 
 HANDLE g_hiocp;
 std::string g_server_ip;
@@ -128,8 +129,8 @@ void SendPacket(int cl, void* packet)
 void ProcessPacket(int ci, unsigned char packet[])
 {
 	switch (packet[1]) {
-	case SC_MOVE_OBJECT: {
-		SC_MOVE_OBJECT_PACKET* move_packet = reinterpret_cast<SC_MOVE_OBJECT_PACKET*>(packet);
+	case S2C_P_MOVE: {
+		sc_packet_move* move_packet = reinterpret_cast<sc_packet_move*>(packet);
 		if (move_packet->id < MAX_CLIENTS) {
 			int my_id = client_map[move_packet->id];
 			if (-1 != my_id) {
@@ -147,14 +148,14 @@ void ProcessPacket(int ci, unsigned char packet[])
 		}
 	}
 					   break;
-	case SC_ADD_OBJECT: break;
-	case SC_REMOVE_OBJECT: break;
-	case SC_CHAT: break;
-	case SC_LOGIN_INFO:
+	case S2C_P_ENTER: break;
+	case S2C_P_LEAVE: break;
+	case S2C_P_CHAT: break;
+	case S2C_P_AVATAR_INFO:
 	{
 		g_clients[ci].connected = true;
 		active_clients++;
-		SC_LOGIN_INFO_PACKET* login_packet = reinterpret_cast<SC_LOGIN_INFO_PACKET*>(packet);
+		sc_packet_avatar_info* login_packet = reinterpret_cast<sc_packet_avatar_info*>(packet);
 		int my_id = ci;
 		client_map[login_packet->id] = my_id;
 		g_clients[my_id].id = login_packet->id;
@@ -295,7 +296,7 @@ void Adjust_Number_Of_Client()
 	SOCKADDR_IN ServerAddr;
 	ZeroMemory(&ServerAddr, sizeof(SOCKADDR_IN));
 	ServerAddr.sin_family = AF_INET;
-	ServerAddr.sin_port = htons(PORT_NUM);
+	ServerAddr.sin_port = htons(GAME_PORT);
 	ServerAddr.sin_addr.s_addr = inet_addr(g_server_ip.c_str());
 
 	int Result = WSAConnect(g_clients[num_connections].client_socket, (sockaddr*)&ServerAddr, sizeof(ServerAddr), NULL, NULL, NULL, NULL);
@@ -314,12 +315,12 @@ void Adjust_Number_Of_Client()
 	DWORD recv_flag = 0;
 	CreateIoCompletionPort(reinterpret_cast<HANDLE>(g_clients[num_connections].client_socket), g_hiocp, num_connections, 0);
 
-	CS_LOGIN_PACKET l_packet;
+	cs_packet_login l_packet;
 
 	int temp = num_connections;
-	sprintf_s(l_packet.name, "%d", temp);
+	sprintf_s(l_packet.name, "Dummy%d", temp);
 	l_packet.size = sizeof(l_packet);
-	l_packet.type = CS_LOGIN;
+	l_packet.type = C2S_P_LOGIN;
 	SendPacket(num_connections, &l_packet);
 
 
@@ -348,9 +349,9 @@ void Test_Thread()
 			if (false == g_clients[i].connected) continue;
 			if (g_clients[i].last_move_time + 1s > high_resolution_clock::now()) continue;
 			g_clients[i].last_move_time = high_resolution_clock::now();
-			CS_MOVE_PACKET my_packet;
+			cs_packet_move my_packet;
 			my_packet.size = sizeof(my_packet);
-			my_packet.type = CS_MOVE;
+			my_packet.type = C2S_P_MOVE;
 			switch (rand() % 4) {
 			case 0: my_packet.direction = 0; break;
 			case 1: my_packet.direction = 1; break;

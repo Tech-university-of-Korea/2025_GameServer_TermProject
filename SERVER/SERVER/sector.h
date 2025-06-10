@@ -9,8 +9,8 @@
 inline constexpr int VIEW_RANGE = 7;
 
 inline constexpr auto VIEW_DIAM = VIEW_RANGE * 2;
-inline constexpr auto SECTOR_WIDTH = MAP_WIDTH / VIEW_DIAM + 1;
-inline constexpr auto SECTOR_HEIGHT = MAP_HEIGHT / VIEW_DIAM + 1;
+inline constexpr auto SECTOR_WIDTH = (MAP_WIDTH / VIEW_DIAM) + 1;
+inline constexpr auto SECTOR_HEIGHT = (MAP_HEIGHT / VIEW_DIAM) + 1;
 
 enum Dir {
 	DIR_CENTER = 0,

@@ -68,6 +68,10 @@ void db_update_user_pos(int32_t session_id)
 	}
 
 	std::string user_id{ session->get_name() };
+	if (g_server.is_dummy_client(user_id)) {
+		return;
+	}
+
 	auto [x, y] = session->get_position();
 
 	std::string exec{ "EXEC store_user_pos '" + user_id + "', " + std::to_string(x) + ", " + std::to_string(y) };

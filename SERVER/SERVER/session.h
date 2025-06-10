@@ -57,6 +57,10 @@ public:
 	void send_chat_packet(int32_t client_id, const char* mess);
     void send_remove_player_packet(int32_t client_id);
 
+public:
+    // EBR
+    uint64_t _epoch_counter{ };
+
 private:
     // SESSION's STATE
     std::mutex _state_lock{ };
@@ -79,7 +83,7 @@ private:
     // VIEW
 	std::unordered_set<int> _view_list{ };
 	std::mutex _view_list_lock{ };
-	int32_t last_move_time{ 0 };
+	int32_t _last_move_time{ 0 };
 
     // FOR NPC
     // LUA SCRIPT

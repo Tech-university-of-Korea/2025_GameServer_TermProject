@@ -78,6 +78,11 @@ void Session::process_packet(char* packet) {
 	switch (packet[1]) {
 	case C2S_P_LOGIN: {
 		cs_packet_login* p = reinterpret_cast<cs_packet_login*>(packet);
+		if (g_server.is_dummy_client(p->name)) {
+			DB_USER_INFO user_info{ rand() % MAP_WIDTH, rand() % MAP_HEIGHT };
+			login(p->name, user_info);
+			break;
+		}
 
 		auto [login_result, user_info] = db_login(_id, p->name);
 		if (false == login_result) {
@@ -93,7 +98,7 @@ void Session::process_packet(char* packet) {
 	case C2S_P_MOVE:
 	{
 		cs_packet_move* p = reinterpret_cast<cs_packet_move*>(packet);
-		//session->last_move_time = p->move_time;
+		_last_move_time = p->move_time;
 		int16_t x = _x;
 		int16_t y = _y;
 		switch (p->direction) {
@@ -101,6 +106,10 @@ void Session::process_packet(char* packet) {
 		case 1: if (y < MAP_HEIGHT - 1) y++; break;
 		case 2: if (x > 0) x--; break;
 		case 3: if (x < MAP_WIDTH - 1) x++; break;
+		}
+		
+		if (false == g_server.is_in_map_area(x, y)) {
+			break;
 		}
 
 		int16_t old_x = _x;
@@ -390,11 +399,14 @@ void Session::do_npc_move(int32_t move_dx, int32_t move_dy) {
 		}
 	}
 
-	int x = _x + move_dx;
-	int y = _y + move_dy;
+	int32_t x = _x + move_dx;
+	int32_t y = _y + move_dy;
+	if (false == g_server.is_in_map_area(x, y)) {
+		return;
+	}
 
-	int old_x = _x;
-	int old_y = _y;
+	int32_t old_x = _x;
+	int32_t old_y = _y;
 	_x = x;
 	_y = y;
 
@@ -571,7 +583,7 @@ void Session::send_move_packet(int32_t client_id) {
 	p.type = S2C_P_MOVE;
 	p.x = x;
 	p.y = y;
-	//p.move_time = session->last_move_time;
+	p.move_time = session->_last_move_time;
 	do_send(&p);
 }
 

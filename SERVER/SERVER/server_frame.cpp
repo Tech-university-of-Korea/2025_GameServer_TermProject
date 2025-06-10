@@ -9,13 +9,26 @@ bool ServerFrame::is_npc(int32_t id) {
 	return id >= MAX_USER;
 }
 
+bool ServerFrame::is_dummy_client(std::string_view name) {
+	std::string s_name{ name };
+	if ("Dummy" == s_name.substr(0, 5)) {
+		return true;
+	}
+
+	return false;
+}
+
+bool ServerFrame::is_in_map_area(int16_t x, int16_t y) {
+	return (x > 0 and x < MAP_WIDTH and y > 0 and y < MAP_HEIGHT);
+}
+
 SessionPtr ServerFrame::get_session(int32_t session_id) {
-    return _sessions.at(session_id).load();
+    return _sessions.at(session_id);
 }
 
 bool ServerFrame::can_see(int32_t from, int32_t to) {
-    auto from_session = _sessions.at(from).load();
-    auto to_session = _sessions.at(to).load();
+    auto from_session = _sessions.at(from);
+    auto to_session = _sessions.at(to);
     if (nullptr == from_session or nullptr == to_session) {
         return false;
     }
@@ -39,6 +52,7 @@ void ServerFrame::disconnect(int32_t client_id) {
 	db_update_user_pos(client_id);
 	session->disconnect();
 
+	g_session_ebr.push_ptr(session);
 	_sessions.at(client_id) = nullptr;
 }
 
@@ -72,7 +86,9 @@ void ServerFrame::wakeup_npc(int32_t npc_id, int32_t waker) {
 
 void ServerFrame::run() {
 	WSADATA WSAData;
-	::WSAStartup(MAKEWORD(2, 2), &WSAData);
+	if (0 != ::WSAStartup(MAKEWORD(2, 2), &WSAData)) {
+		std::cout << "WSAStartup Failure\n";
+	}
 
 	_server_socket = ::WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
 	sockaddr_in server_addr;
@@ -116,7 +132,7 @@ void ServerFrame::run() {
 void ServerFrame::initialize_npc() {
 	std::cout << "NPC intialize begin.\n";
 	for (int i = MAX_USER; i < MAX_USER + NUM_MONSTER; ++i) {
-		auto new_session = std::make_shared<Session>(INVALID_SOCKET, i);
+		auto new_session = new Session{ INVALID_SOCKET, i };
 		_sessions.insert(std::make_pair(i, new_session));
 
 		auto npc = get_session(i);
@@ -134,7 +150,7 @@ void ServerFrame::initialize_npc() {
 void ServerFrame::do_accept() {
 	int32_t client_id = _new_client_id++;
 	if (client_id != MAX_USER) {
-		auto new_session = std::make_shared<Session>(_client_socket, client_id);
+		auto new_session = g_session_ebr.pop_ptr(_client_socket, client_id);
 		_sessions.insert(std::make_pair(client_id, new_session));
 
 		auto session = get_session(client_id);
@@ -168,12 +184,16 @@ void ServerFrame::do_accept() {
 }
 
 void ServerFrame::worker_thread() {
+	init_tls();
+
 	while (true) {
 		DWORD num_bytes;
 		ULONG_PTR key;
 		WSAOVERLAPPED* over = nullptr;
 		BOOL ret = GetQueuedCompletionStatus(_iocp_handle, &num_bytes, &key, &over, INFINITE);
 		OverExp* ex_over = reinterpret_cast<OverExp*>(over);
+
+		EBRGuard ebr_guard{ g_session_ebr, l_thread_id };
 
 		if (FALSE == ret) {
 			if (ex_over->_comp_type == OP_ACCEPT) {
@@ -296,7 +316,12 @@ void ServerFrame::worker_thread() {
 }
 
 void ServerFrame::timer_thread() {
+	init_tls();
+
 	while (true) {
+		// 필요할 경우 EBR 적용
+		// 현재는 timer_thread에서 session 객체 사용 X -> EBR 적용 필요 X
+		
 		TIMER_EVENT ev;
 		auto current_time = std::chrono::system_clock::now();
 		if (false == _timer_queue.try_pop(ev)) {
