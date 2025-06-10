@@ -63,11 +63,11 @@ void ServerFrame::wakeup_npc(int32_t npc_id, int32_t waker) {
 	}
 
 	bool old_state = false;
-	if (false == npc->update_active_state_cas(true)) {
+	if (false == npc->update_active_state_cas(old_state, true)) {
 		return;
 	}
 
-	add_timer_event(npc_id, 0s, EV_RANDOM_MOVE, 0);
+	add_timer_event(npc_id, 1s, EV_RANDOM_MOVE, 0);
 }
 
 void ServerFrame::run() {
@@ -121,7 +121,7 @@ void ServerFrame::initialize_npc() {
 
 		auto npc = get_session(i);
 		npc->init_npc_name(std::format("NPC{}", i));
-		npc->update_position(rand() % MAP_WIDTH, rand() % MAP_HEIGHT);
+        npc->update_position(rand() % MAP_WIDTH, rand() % MAP_HEIGHT);
 
 		auto [x, y] = npc->get_position();
 		auto _ = g_sector.insert(i, x, y);
@@ -237,7 +237,7 @@ void ServerFrame::worker_thread() {
 			bool keep_alive = false;
 			auto [npc_x, npc_y] = npc->get_position();
 			auto [sector_x, sector_y] = g_sector.get_sector_idx(npc_x, npc_y);
-			for (auto dir = 0; dir < DIRECTION_CNT; ++dir) {
+			for (auto dir = 0; dir < DIR_CNT; ++dir) {
 				auto [dx, dy] = DIRECTIONS[dir];
 				if (false == g_sector.is_valid_sector(sector_x + dx, sector_y + dy)) {
 					continue;
@@ -250,7 +250,7 @@ void ServerFrame::worker_thread() {
 					}
 
 					auto client = get_session(cl);
-					if (client->get_state() != ST_INGAME) {
+					if (nullptr != client and ST_INGAME != client->get_state()) {
 						continue;
 					}
 
@@ -258,6 +258,10 @@ void ServerFrame::worker_thread() {
 						keep_alive = true;
 						break;
 					}
+				}
+
+				if (true == keep_alive) {
+					break;
 				}
 			}
 

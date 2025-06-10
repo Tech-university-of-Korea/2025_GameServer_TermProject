@@ -11,9 +11,22 @@ inline constexpr int VIEW_RANGE = 7;
 inline constexpr auto VIEW_DIAM = VIEW_RANGE * 2;
 inline constexpr auto SECTOR_WIDTH = MAP_WIDTH / VIEW_DIAM + 1;
 inline constexpr auto SECTOR_HEIGHT = MAP_HEIGHT / VIEW_DIAM + 1;
-inline constexpr auto DIRECTION_CNT = 9;
 
-constexpr std::array<std::pair<int8_t, int8_t>, DIRECTION_CNT> DIRECTIONS{
+enum Dir {
+	DIR_CENTER = 0,
+	DIR_UP,
+	DIR_DOWN,
+	DIR_LEFT,
+	DIR_RIGHT,
+	DIR_LEFT_UP,
+	DIR_RIGHT_UP,
+	DIR_LEFT_DOWN,
+	DIR_RIGHT_DOWN,
+
+	DIR_CNT
+};
+
+constexpr std::array<const std::pair<int8_t, int8_t>, DIR_CNT> DIRECTIONS{
 	std::pair<int8_t, int8_t>{ 0, 0 },
 	std::pair<int8_t, int8_t>{ 0, -1 },
 	std::pair<int8_t, int8_t>{ 0, 1 },

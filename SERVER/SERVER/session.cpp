@@ -90,7 +90,8 @@ void Session::process_packet(char* packet) {
 		break;
 	}
 
-	case C2S_P_MOVE: {
+	case C2S_P_MOVE:
+	{
 		cs_packet_move* p = reinterpret_cast<cs_packet_move*>(packet);
 		//session->last_move_time = p->move_time;
 		int16_t x = _x;
@@ -107,7 +108,8 @@ void Session::process_packet(char* packet) {
 		_x = x;
 		_y = y;
 
-		auto [sector_x, sector_y] = g_sector.update_sector(_id, old_x, old_y, x, y);
+		// update view list & send move packet
+		auto [sector_x, sector_y] = g_sector.update_sector(_id, old_x, old_y, _x, _y);
 
 		std::unordered_set<int> near_list;
 		_view_list_lock.lock();
@@ -115,7 +117,7 @@ void Session::process_packet(char* packet) {
 		_view_list_lock.unlock();
 
 		// 주변 9개 섹터에 대해 검색s
-		for (auto dir = 0; dir < DIRECTION_CNT; ++dir) {
+		for (auto dir = 0; dir < DIR_CNT; ++dir) {
 			auto [dx, dy] = DIRECTIONS[dir];
 			if (false == g_sector.is_valid_sector(sector_x + dx, sector_y + dy)) {
 				continue;
@@ -183,11 +185,14 @@ void Session::process_packet(char* packet) {
 				}
 			}
 		}
-
-		send_chat_packet(_id, "HELLO");
-
-        break;
 	}
+    break;
+
+	case C2S_P_ATTACK:
+	{
+		attack_near_area();
+	}
+    break;
 
 	default:
 		break;
@@ -213,7 +218,7 @@ void Session::login(std::string_view name, const DB_USER_INFO& user_info) {
 
 	// 주변 9개 섹터 모두 검색
 	auto [sector_x, sector_y] = g_sector.insert(_id, _x, _y);
-	for (auto dir = 0; dir < DIRECTION_CNT; ++dir) {
+	for (auto dir = 0; dir < DIR_CNT; ++dir) {
 		auto [dx, dy] = DIRECTIONS[dir];
 		if (false == g_sector.is_valid_sector(sector_x + dx, sector_y + dy)) {
 			continue;
@@ -253,6 +258,40 @@ void Session::login(std::string_view name, const DB_USER_INFO& user_info) {
 	}
 }
 
+void Session::attack_near_area() {
+	_view_list_lock.lock();
+	std::unordered_set<int> old_vlist = _view_list;
+	_view_list_lock.unlock();
+
+	auto [x, y] = get_position();
+
+	send_chat_packet(_id, "ATTACK!");
+	std::vector<int32_t> attacked_npc{ };
+	for (auto cl : old_vlist) {
+		auto client = g_server.get_session(cl);
+		if (nullptr == client or ST_INGAME != client->get_state() or false == client->is_active()) {
+			continue;
+		}
+
+		auto [cl_x, cl_y] = client->get_position();
+		for (int32_t dir = 0; dir < DIR_CNT; ++dir) {
+			auto [dx, dy] = DIRECTIONS[dir];
+
+			auto attack_pos_x = x + dx;
+			auto attack_pos_y = y + dy;
+			if (attack_pos_x != cl_x or attack_pos_y != cl_y) {
+				continue;
+			}
+
+            send_chat_packet(cl, std::format("ATTACKED BY {}", _name).c_str());
+			if (g_server.is_pc(cl)) {
+				client->send_chat_packet(cl, std::format("ATTACKED BY {}", _name).c_str());
+			}
+			break;
+		}
+	}
+}
+
 bool Session::initialize_lua_script() {
 	_lua_state = luaL_newstate();
 	luaL_openlibs(_lua_state);
@@ -278,9 +317,12 @@ void Session::update_active_state(bool active) {
 	_is_active = active;
 }
 
-bool Session::update_active_state_cas(bool active) {
-	bool old_state = !active;
-	return std::atomic_compare_exchange_strong(&_is_active, &old_state, active);
+bool Session::update_active_state_cas(bool& old_state, bool new_state) {
+	if (old_state == new_state) {
+		return false;
+	}
+
+	return std::atomic_compare_exchange_strong(&_is_active, &old_state, new_state);
 }
 
 void Session::disconnect() {
@@ -321,7 +363,7 @@ void Session::do_npc_move(int32_t move_dx, int32_t move_dy) {
 	std::unordered_set<int> old_vl;
 	// 움직이기 전 섹터에 있던 오브젝트들 모두 추가
 	auto [prev_sector_x, prev_sector_y] = g_sector.get_sector_idx(_x, _y);
-	for (auto dir = 0; dir < DIRECTION_CNT; ++dir) {
+	for (auto dir = 0; dir < DIR_CNT; ++dir) {
 		auto [dx, dy] = DIRECTIONS[dir];
 		if (false == g_sector.is_valid_sector(prev_sector_x + dx, prev_sector_y + dy)) {
 			continue;
@@ -361,7 +403,7 @@ void Session::do_npc_move(int32_t move_dx, int32_t move_dy) {
 
 	// 움직인 후 섹터에 있는 오브젝트들 검사
 	std::unordered_set<int> new_vl;
-	for (auto dir = 0; dir < DIRECTION_CNT; ++dir) {
+	for (auto dir = 0; dir < DIR_CNT; ++dir) {
 		auto [dx, dy] = DIRECTIONS[dir];
 		if (false == g_sector.is_valid_sector(curr_sector_x + dx, curr_sector_y + dy)) {
 			continue;
@@ -566,7 +608,7 @@ void Session::send_chat_packet(int32_t player_id, const char* message) {
 
 	sc_packet_chat packet;
 	packet.id = player_id;
-	packet.size = sizeof(sc_packet_chat) - MAX_CHAT_LENGTH + message_len;
+	packet.size = static_cast<char>(sizeof(sc_packet_chat) - MAX_CHAT_LENGTH + message_len + 1);
 	packet.type = S2C_P_CHAT;
 	std::memset(packet.message, 0, MAX_CHAT_LENGTH);
 	std::memcpy(packet.message, message, message_len);

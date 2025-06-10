@@ -35,10 +35,11 @@ public:
 
     void init_npc_name(std::string_view name);
     void login(std::string_view name, const DB_USER_INFO& user_info);
+    void attack_near_area();
     bool initialize_lua_script();
 
     void update_active_state(bool active);
-    bool update_active_state_cas(bool active);
+    bool update_active_state_cas(bool& old_state, bool new_state);
     void disconnect();
 
     void do_npc_move(int32_t move_dx, int32_t move_dy);
@@ -80,10 +81,10 @@ private:
 	std::mutex _view_list_lock{ };
 	int32_t last_move_time{ 0 };
 
+    // FOR NPC
     // LUA SCRIPT
     std::mutex _lua_lock{ };
     lua_State* _lua_state{ nullptr };
 
-    // FOR NPC
     std::atomic_bool _is_active{ false };
 };

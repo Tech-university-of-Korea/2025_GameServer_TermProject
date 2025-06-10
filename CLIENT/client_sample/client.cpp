@@ -386,10 +386,19 @@ int main()
 				case sf::Keyboard::Down:
 					direction = 1;
 					break;
+				case sf::Keyboard::LControl:
+				{
+					cs_packet_attack p;
+					p.size = sizeof(p);
+					p.type = C2S_P_ATTACK;
+					send_packet(&p);
+				}
+				break;
 				case sf::Keyboard::Escape:
 					window.close();
 					break;
 				}
+
 				if (-1 != direction) {
 					cs_packet_move p;
 					p.size = sizeof(p);
