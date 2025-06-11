@@ -56,7 +56,7 @@ void Object::draw() {
 		g_window->draw(m_chat);
 	}
 
-	g_hp_bar->draw(rx, ry - 10, 100, 100);
+	g_hp_bar->draw(rx + 32, ry - 10, m_hp, m_max_hp, 2.0f);
 }
 
 void Object::set_name(const char str[]) {

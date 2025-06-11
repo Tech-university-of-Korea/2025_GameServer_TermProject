@@ -22,7 +22,8 @@ public:
 	int32_t m_id{ };
 	int32_t m_x{ };
 	int32_t m_y{ };
-	int32_t m_hp{ 100 };
+	int32_t m_hp{ };
+	int32_t m_max_hp{ };
 	int32_t m_level{ };
 	char name[MAX_ID_LENGTH]{ };
 

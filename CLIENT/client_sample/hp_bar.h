@@ -16,7 +16,7 @@ public:
     ~HpBar();
 
 public:
-    void draw(int32_t x, int32_t y, int32_t hp, int32_t max_hp);
+    void draw(int32_t x, int32_t y, int32_t hp, int32_t max_hp, float scale);
 
 private:
     sf::Sprite m_hp_bar{ };

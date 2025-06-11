@@ -2,12 +2,15 @@
 
 #include "overlapped.h"
 #include "db_functions.h"
+#include <cstdint>
 
 enum S_STATE { 
     ST_FREE, 
     ST_ALLOC, 
     ST_INGAME 
 };
+
+constexpr int32_t TEMP_ATTACK_DAMAGE = 10;
 
 class Session {
 public:
@@ -24,6 +27,9 @@ public:
     int16_t get_y();
     std::pair<int16_t, int16_t> get_position();
     std::string_view get_name();
+    int32_t get_hp();
+
+    void update_hp(int32_t diff);
 
     void update_position(int16_t x, int16_t y);
     void update_position_atomic(int16_t x, int16_t y);
@@ -48,6 +54,8 @@ public:
     void process_event_player_move(int32_t target_obj);
     void process_event_npc_move();
 
+    void attack(int32_t client_id);
+
 	void do_recv();
 	void do_send(void* packet);
 	void send_login_info_packet();
@@ -56,6 +64,7 @@ public:
 	void send_add_player_packet(int32_t client_id);
 	void send_chat_packet(int32_t client_id, const char* mess);
     void send_remove_player_packet(int32_t client_id);
+    void send_attack_packet(int32_t target);
 
 public:
     // EBR
@@ -72,6 +81,7 @@ private:
     int16_t _y{ 0 };
     int32_t _level{ 1 };
     int32_t _exp{ 0 };
+    std::atomic_int32_t _hp{ 100 };
 
     // NETWORK 
 	SOCKET _socket{ INVALID_SOCKET };

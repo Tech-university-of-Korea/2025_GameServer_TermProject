@@ -35,6 +35,14 @@ std::string_view Session::get_name() {
 	return _name;
 }
 
+int32_t Session::get_hp() {
+	return _hp;
+}
+
+void Session::update_hp(int32_t diff) {
+	_hp.fetch_add(diff);
+}
+
 S_STATE Session::get_state() {
 	return _state;
 }
@@ -292,10 +300,7 @@ void Session::attack_near_area() {
 				continue;
 			}
 
-            send_chat_packet(cl, std::format("ATTACKED BY {}", _name).c_str());
-			if (g_server.is_pc(cl)) {
-				client->send_chat_packet(cl, std::format("ATTACKED BY {}", _name).c_str());
-			}
+			attack(cl);
 			break;
 		}
 	}
@@ -535,6 +540,32 @@ void Session::process_event_npc_move() {
 	g_server.add_timer_event(_id, 1s, EV_RANDOM_MOVE, 0);
 }
 
+void Session::attack(int32_t client_id) {
+	auto session = g_server.get_session(client_id);
+	if (nullptr == session) {
+		return;
+	}
+
+	session->update_hp(-TEMP_ATTACK_DAMAGE);
+	if (session->get_hp() <= 0) {
+		session->update_active_state(false);
+
+		auto [x, y] = session->get_position();
+		g_sector.erase(client_id, x, y);
+
+		send_chat_packet(SYSTEM_ID, std::format("YOU KILLED {}", session->get_name()).c_str());
+		send_remove_player_packet(client_id);
+		return;
+	}
+
+	send_chat_packet(client_id, std::format("ATTACKED BY {}", _name).c_str());
+	send_attack_packet(client_id);
+	if (g_server.is_pc(client_id)) {
+		session->send_chat_packet(client_id, std::format("ATTACKED BY {}", _name).c_str());
+		send_attack_packet(client_id);
+	}
+}
+
 void Session::do_recv() {
 	DWORD recv_flag{ 0 };
 	::memset(&_recv_over._over, 0, sizeof(_recv_over._over));
@@ -557,6 +588,8 @@ void Session::send_login_info_packet() {
 	p.type = S2C_P_AVATAR_INFO;
 	p.x = _x;
 	p.y = _y;
+	p.hp = _hp;
+	p.max_hp = 100;
 	do_send(&p);
 }
 
@@ -602,6 +635,8 @@ void Session::send_add_player_packet(int32_t client_id) {
 	enter_packet.type = S2C_P_ENTER;
 	enter_packet.x = x;
 	enter_packet.y = y;
+	enter_packet.hp = _hp;
+	enter_packet.max_hp = 100;
 
 	{
         std::lock_guard view_list_guard{ _view_list_lock };
@@ -644,4 +679,21 @@ void Session::send_remove_player_packet(int32_t client_id) {
 	p.size = sizeof(p);
 	p.type = S2C_P_LEAVE;
 	do_send(&p);
+}
+
+void Session::send_attack_packet(int32_t target) {
+	auto session = g_server.get_session(target);
+	if (nullptr == session) {
+		return;
+	}
+
+	auto hp = session->get_hp();
+
+	sc_packet_attack attack_packet;
+	attack_packet.id = target;
+	attack_packet.size = sizeof(attack_packet);
+	attack_packet.type = S2C_P_ATTACK;
+	attack_packet.hp = hp;
+
+	do_send(&attack_packet);
 }

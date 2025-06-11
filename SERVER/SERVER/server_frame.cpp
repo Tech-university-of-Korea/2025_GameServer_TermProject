@@ -72,7 +72,7 @@ void ServerFrame::wakeup_npc(int32_t npc_id, int32_t waker) {
 	exover->_ai_target_obj = waker;
 	::PostQueuedCompletionStatus(_iocp_handle, 1, npc_id, &exover->_over);
 
-	if (true == npc->is_active()) {
+	if (true == npc->is_active() or npc->get_hp() <= 0) {
 		return;
 	}
 
@@ -251,6 +251,12 @@ void ServerFrame::worker_thread() {
 			int32_t npc_id = static_cast<int32_t>(key);
 			auto npc = get_session(npc_id);
 			if (nullptr == npc) {
+				delete ex_over;
+				break;
+			}
+
+			if (false == npc->is_active()) {
+				delete ex_over;
 				break;
 			}
 
@@ -300,6 +306,7 @@ void ServerFrame::worker_thread() {
 			int32_t npc_id = static_cast<int32_t>(key);
 			auto npc = get_session(npc_id);
 			if (nullptr == npc) {
+				delete ex_over;
 				break;
 			}
 

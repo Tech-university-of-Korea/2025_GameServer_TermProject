@@ -31,6 +31,8 @@ void process_packet(char* ptr)
 		sc_packet_avatar_info* packet = reinterpret_cast<sc_packet_avatar_info*>(ptr);
 		g_myid = packet->id;
 		avatar.m_id = g_myid;
+		avatar.m_hp = packet->hp;
+		avatar.m_max_hp = packet->max_hp;
 		avatar.move(packet->x, packet->y);
 		g_left_x = packet->x - SCREEN_WIDTH / 2;
 		g_top_y = packet->y - SCREEN_HEIGHT / 2;
@@ -52,6 +54,8 @@ void process_packet(char* ptr)
 		else if (id < MAX_USER) {
 			players[id] = Object{ *pieces, 0, 0, 64, 64 };
 			players[id].m_id = id;
+			players[id].m_hp = my_packet->hp;
+			players[id].m_max_hp = my_packet->max_hp;
 			players[id].move(my_packet->x, my_packet->y);
 			players[id].set_name(my_packet->name);
 			players[id].show();
@@ -59,6 +63,8 @@ void process_packet(char* ptr)
 		else {
 			players[id] = Object{ *pieces, 256, 0, 64, 64 };
 			players[id].m_id = id;
+			players[id].m_hp = my_packet->hp;
+			players[id].m_max_hp = my_packet->max_hp;
 			players[id].move(my_packet->x, my_packet->y);
 			players[id].set_name(my_packet->name);
 			players[id].show();
@@ -118,6 +124,13 @@ void process_packet(char* ptr)
 		sc_packet_login_fail* packet = reinterpret_cast<sc_packet_login_fail*>(ptr);
 		print_login_fail_reason(packet->reason);
 		g_window->close();
+	}
+	break;
+
+	case S2C_P_ATTACK:
+	{
+		sc_packet_attack* packet = reinterpret_cast<sc_packet_attack*>(ptr);
+		players[packet->id].m_hp = packet->hp;
 	}
 	break;
 

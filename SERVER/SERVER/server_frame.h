@@ -5,7 +5,11 @@
 
 using SessionPtr = Session*;
 
-enum TIMER_EVENT_TYPE { EV_RANDOM_MOVE };
+enum TIMER_EVENT_TYPE { 
+    EV_RANDOM_MOVE,
+    EV_MONSTER_RESPAWN,
+};
+
 enum DB_EVENT_TYPE { 
     DB_LOGIN, 
     DB_UPDATE_USER_INFO

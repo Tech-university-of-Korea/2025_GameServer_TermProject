@@ -42,7 +42,7 @@ void client_finish()
 	HpBar::destroy_texture();
 }
 
-void set_system_message()
+void draw_system_message()
 {
 	auto current_time = std::chrono::system_clock::now();
 	std::erase_if(g_system_messages, [current_time](const auto& mess) {
@@ -61,17 +61,21 @@ void set_system_message()
 		}
 	}
 
-	std::string merged_string;
-	for (const auto& mess : g_system_messages) {
-		merged_string.append(mess.message + "\n");
+	for (int32_t cnt{ 1 };  const auto& mess : g_system_messages) {
+        g_system_message.setString(mess.message);
+		auto size = g_system_message.getGlobalBounds();
+
+        sf::View view;
+        g_window->getViewport(view);
+        auto center = view.getCenter();
+        center.y = cnt * 20.0f;
+		center.x -= size.width / 2.0f;
+        g_system_message.setPosition(center);
+        g_window->draw(g_system_message);
+
+		++cnt;
 	}
 
-	g_system_message.setString(merged_string);
-	sf::View view;
-	g_window->getViewport(view);
-	auto center = view.getCenter();
-	center.y = 20.0f;
-	g_system_message.setPosition(center);
 }
 
 void client_main()
@@ -80,17 +84,19 @@ void client_main()
 	size_t	received;
 
 	auto recv_result = s_socket.receive(net_buf, BUF_SIZE, received);
-	if (recv_result == sf::Socket::Error)
-	{
+	if (recv_result == sf::Socket::Error) {
 		std::wcout << L"Recv ¿¡·¯!";
 		exit(-1);
 	}
+
 	if (recv_result == sf::Socket::Disconnected) {
 		std::wcout << L"Disconnected\n";
 		exit(-1);
 	}
-	if (recv_result != sf::Socket::NotReady)
+
+	if (recv_result != sf::Socket::NotReady) {
 		if (received > 0) process_data(net_buf, received);
+	}
 
 	for (int i = 0; i < SCREEN_WIDTH; ++i) {
 		for (int j = 0; j < SCREEN_HEIGHT; ++j)
@@ -119,8 +125,7 @@ void client_main()
 	text.setString(buf);
 	g_window->draw(text);
 
-	set_system_message();
-	g_window->draw(g_system_message);
+	draw_system_message();
 }
 
 void send_packet(void *packet)

@@ -19,9 +19,10 @@ constexpr char C2S_P_MOVE = 6;
 constexpr char S2C_P_CHAT = 7;
 constexpr char S2C_P_STAT_CHANGE = 8;
 constexpr char S2C_P_LOGIN_FAIL = 9;
-constexpr char C2S_P_ATTACK = 10;
-constexpr char C2S_P_CHAT = 11;
-constexpr char C2S_P_TELEPORT = 12;		// 동접 테스트 할 때
+constexpr char S2C_P_ATTACK = 10;
+constexpr char C2S_P_ATTACK = 65;
+constexpr char C2S_P_CHAT = 66;
+constexpr char C2S_P_TELEPORT = 67;		// 동접 테스트 할 때
 										// 시작마을의 HOTSPOT을 방지하기 위해 
 										// RANDOM TELEPORT할 때 사용
 
@@ -42,10 +43,10 @@ struct sc_packet_avatar_info {
 	char type;
 	long long  id;
 	short x, y;
-	short max_hp;
-	short hp;
 	short level;
 	int   exp;
+	int hp;
+	int max_hp;
 };
 
 struct sc_packet_move {
@@ -64,8 +65,10 @@ struct sc_packet_enter {
 	long long  id;
 	char name[MAX_ID_LENGTH];
 	char o_type;						// 0 : PLAYER
-										// 1...  : NPC들  
+										// 1...  : NPC들 
 	short x, y;
+	int hp;
+	int max_hp;
 };
 
 struct sc_packet_leave {
@@ -90,6 +93,13 @@ struct sc_packet_stat_change {
 	short hp;
 	short level;
 	int   exp;
+};
+
+struct sc_packet_attack {
+	unsigned char size;
+	char type;
+	long long id;
+	int hp;
 };
 
 struct sc_packet_login_fail {

@@ -30,17 +30,18 @@ HpBar::HpBar() {
 
 HpBar::~HpBar() { }
 
-void HpBar::draw(int32_t x, int32_t y, int32_t hp, int32_t max_hp) {
+void HpBar::draw(int32_t x, int32_t y, int32_t hp, int32_t max_hp, float scale) {
     if (0 == max_hp) {
         return;
     }
 
     float percent = std::clamp(hp / static_cast<float>(max_hp), 0.0f, 1.0f);
-    m_hp_bar.setPosition(static_cast<float>(x + m_offset) - 25, static_cast<float>(y));
-    m_outline.setPosition(static_cast<float>(x) - 25, static_cast<float>(y));
-
+    m_hp_bar.setPosition(static_cast<float>(x + m_offset * scale) - (50.0f  * scale), static_cast<float>(y));
     m_hp_bar.setTextureRect(sf::IntRect(0, 0, static_cast<int32_t>(percent * m_hp_width), 8));
-
-    g_window->draw(m_outline);
+    m_hp_bar.setScale(scale, scale);
     g_window->draw(m_hp_bar);
+
+    m_outline.setPosition(static_cast<float>(x) - (50.0f * scale), static_cast<float>(y));
+    m_outline.setScale(scale, scale);
+    g_window->draw(m_outline);
 }
