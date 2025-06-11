@@ -5,6 +5,7 @@ enum COMP_TYPE {
 	OP_RECV, 
 	OP_SEND, 
 	OP_NPC_MOVE, 
+	OP_NPC_RESPAWN,
 	OP_AI_HELLO 
 };
 

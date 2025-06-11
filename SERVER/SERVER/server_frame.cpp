@@ -301,6 +301,24 @@ void ServerFrame::worker_thread() {
 		}
         break;
 
+		case OP_NPC_RESPAWN:
+		{
+			int32_t npc_id = static_cast<int32_t>(key);
+			auto npc = get_session(npc_id);
+			if (nullptr == npc) {
+				delete ex_over;
+				break;
+			}
+
+			std::cout << std::format("Respawn npc: {}\n", npc_id);
+			if (true == npc->try_respawn(100)) {
+				auto [x, y] = npc->get_position();
+				g_sector.insert(npc_id, x, y);
+			}
+			delete ex_over;
+		}
+		break;
+
 		case OP_AI_HELLO: 
 		{
 			int32_t npc_id = static_cast<int32_t>(key);
@@ -350,6 +368,14 @@ void ServerFrame::timer_thread() {
             ov->_comp_type = OP_NPC_MOVE;
             ::PostQueuedCompletionStatus(_iocp_handle, 1, ev.obj_id, &ov->_over);
         }
+		break;
+
+		case EV_MONSTER_RESPAWN:
+		{
+			OverExp* ov = new OverExp;
+			ov->_comp_type = OP_NPC_RESPAWN;
+			::PostQueuedCompletionStatus(_iocp_handle, 1, ev.obj_id, &ov->_over);
+		}
         break;
 
         default:

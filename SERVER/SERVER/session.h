@@ -29,6 +29,7 @@ public:
     std::string_view get_name();
     int32_t get_hp();
 
+    bool try_respawn(int32_t max_hp);
     void update_hp(int32_t diff);
 
     void update_position(int16_t x, int16_t y);

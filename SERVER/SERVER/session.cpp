@@ -39,6 +39,11 @@ int32_t Session::get_hp() {
 	return _hp;
 }
 
+bool Session::try_respawn(int32_t max_hp) {
+	auto old_hp = _hp.load();
+	return _hp.compare_exchange_strong(old_hp, max_hp);
+}
+
 void Session::update_hp(int32_t diff) {
 	_hp.fetch_add(diff);
 }
@@ -555,6 +560,8 @@ void Session::attack(int32_t client_id) {
 
 		send_chat_packet(SYSTEM_ID, std::format("YOU KILLED {}", session->get_name()).c_str());
 		send_remove_player_packet(client_id);
+
+		g_server.add_timer_event(client_id, 5s, EV_MONSTER_RESPAWN, SYSTEM_ID);
 		return;
 	}
 
