@@ -212,9 +212,17 @@ void Session::process_packet(char* packet) {
 
 	case C2S_P_ATTACK:
 	{
+		cs_packet_attack* p = reinterpret_cast<cs_packet_attack*>(packet);
 		attack_near_area();
 	}
     break;
+
+	case C2S_P_CHAT:
+	{
+		cs_packet_chat* p = reinterpret_cast<cs_packet_chat*>(packet);
+		g_server.send_chat_packet_to_every_one(_id, p->message);
+	}
+	break;
 
 	default:
 		break;

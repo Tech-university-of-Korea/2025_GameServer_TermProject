@@ -141,6 +141,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="client.cpp" />
+    <ClCompile Include="Console.cpp" />
     <ClCompile Include="hp_bar.cpp" />
     <ClCompile Include="message_system.cpp" />
     <ClCompile Include="network_modules.cpp" />
@@ -163,6 +164,7 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Console.h" />
     <ClInclude Include="game_header.h" />
     <ClInclude Include="hp_bar.h" />
     <ClInclude Include="message_system.h" />

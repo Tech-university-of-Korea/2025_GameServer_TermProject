@@ -38,6 +38,7 @@ std::pair<bool, DB_USER_INFO> db_login(int32_t session_id, const char* id)
 		if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
 			user_info.x = static_cast<int16_t>(user_x);
 			user_info.y = static_cast<int16_t>(user_y);
+			user_id[cb_user_id] = 0;
 			printf("login confirm: id: [%ls],  x: %d y: %d\n", user_id, user_x, user_y);
 			SQLCloseCursor(h_stmt);
 			return std::make_pair(true, user_info);
@@ -88,7 +89,7 @@ void db_update_user_pos(int32_t session_id)
 		}
 
 		if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
-			printf("update confirm: id: [%s],  x: %d y: %d\n", user_id.c_str(), x, y);
+			printf("update confirm: id: [%s], x: %d y: %d\n", user_id.c_str(), x, y);
 			SQLCloseCursor(h_stmt);
 			return;
 		}

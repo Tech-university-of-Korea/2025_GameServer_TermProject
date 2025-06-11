@@ -18,12 +18,12 @@
 
 using namespace std::literals;
 
-constexpr auto SCREEN_WIDTH = 16;
-constexpr auto SCREEN_HEIGHT = 16;
+constexpr auto SCREEN_WIDTH = 20;
+constexpr auto SCREEN_HEIGHT = 15;
 
 constexpr auto TILE_WIDTH = 65;
 constexpr auto WINDOW_WIDTH = SCREEN_WIDTH * TILE_WIDTH;   // size of window
-constexpr auto WINDOW_HEIGHT = SCREEN_WIDTH * TILE_WIDTH;
+constexpr auto WINDOW_HEIGHT = SCREEN_HEIGHT * TILE_WIDTH;
 
 constexpr auto MESSAGE_TIMEOUT = 2000ms;
 constexpr auto MAX_CNT_STORED_SYSTEM_MESS = 10;

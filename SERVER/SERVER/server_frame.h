@@ -49,6 +49,8 @@ public:
     void add_timer_event(int32_t id, std::chrono::system_clock::duration delay, TIMER_EVENT_TYPE type, int32_t target_id);
     void wakeup_npc(int32_t npc_id, int32_t waker);
 
+    void send_chat_packet_to_every_one(int32_t sender, std::string_view message);
+
     void run();
 
 private:

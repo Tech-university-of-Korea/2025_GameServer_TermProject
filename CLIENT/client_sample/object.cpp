@@ -45,18 +45,36 @@ void Object::draw() {
 
 	g_window->draw(m_sprite);
 
-	if (m_mess_end_time < std::chrono::system_clock::now()) {
-		auto size = m_name.getGlobalBounds();
-		m_name.setPosition(rx + 32.0f - size.width / 2.0f, ry - 50.0f);
-		g_window->draw(m_name);
+	if (g_myid == m_id) {
+		g_hp_bar->draw_player_hp(20, 50, m_hp, m_max_hp, 4.0f, false);
+	}
+	else if (m_id < MAX_USER) {
+		g_hp_bar->draw_player_hp(rx + 32, ry - 10, m_hp, m_max_hp, 2.0f);
 	}
 	else {
-		auto size = m_chat.getGlobalBounds();
-		m_chat.setPosition(rx + 32.0f - size.width / 2.0f, ry - 50.0f);
-		g_window->draw(m_chat);
+		g_hp_bar->draw_enemy_hp(rx + 32, ry - 10, m_hp, m_max_hp, 2.0f);
 	}
 
-	g_hp_bar->draw(rx + 32, ry - 10, m_hp, m_max_hp, 2.0f);
+	if (MAX_USER <= m_id) {
+		if (m_mess_end_time < std::chrono::system_clock::now()) {
+			auto size = m_name.getGlobalBounds();
+			auto y = g_myid == m_id ? ry - 10.0f : ry - 50.0f;
+			m_name.setPosition(rx + 32.0f - size.width / 2.0f, y);
+			g_window->draw(m_name);
+		}
+		else {
+			auto size = m_chat.getGlobalBounds();
+			auto y = g_myid == m_id ? ry - 10.0f : ry - 50.0f;
+			m_chat.setPosition(rx + 32.0f - size.width / 2.0f, y);
+			g_window->draw(m_chat);
+		}
+	}
+	else {
+		auto size = m_name.getGlobalBounds();
+		auto y = g_myid == m_id ? ry - 10.0f : ry - 50.0f;
+		m_name.setPosition(rx + 32.0f - size.width / 2.0f, y);
+		g_window->draw(m_name);
+	}
 }
 
 void Object::set_name(const char str[]) {

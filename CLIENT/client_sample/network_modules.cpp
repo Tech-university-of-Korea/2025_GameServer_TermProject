@@ -74,7 +74,7 @@ void process_packet(char* ptr)
 	case S2C_P_MOVE:
 	{
 		sc_packet_move* my_packet = reinterpret_cast<sc_packet_move*>(ptr);
-		int other_id = my_packet->id;
+		int32_t other_id = my_packet->id;
 		if (other_id == g_myid) {
 			avatar.move(my_packet->x, my_packet->y);
 			g_left_x = my_packet->x - SCREEN_WIDTH / 2;
@@ -110,11 +110,11 @@ void process_packet(char* ptr)
 		}
 
 		int other_id = my_packet->id;
-		if (other_id == g_myid) {
-			avatar.set_chat(my_packet->message);
+		if (MAX_USER <= other_id) {
+			players[other_id].set_chat(my_packet->message);
 		}
 		else {
-			players[other_id].set_chat(my_packet->message);
+			// TODO Chatting system
 		}
 	}
 	break;

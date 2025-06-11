@@ -64,13 +64,9 @@ void draw_system_message()
 	for (int32_t cnt{ 1 };  const auto& mess : g_system_messages) {
         g_system_message.setString(mess.message);
 		auto size = g_system_message.getGlobalBounds();
-
-        sf::View view;
-        g_window->getViewport(view);
-        auto center = view.getCenter();
-        center.y = cnt * 20.0f;
-		center.x -= size.width / 2.0f;
-        g_system_message.setPosition(center);
+		auto x = WINDOW_WIDTH / 2.0f - size.width / 2.0f;
+        auto y = cnt * 20.0f;
+        g_system_message.setPosition(x, y);
         g_window->draw(g_system_message);
 
 		++cnt;
@@ -171,28 +167,32 @@ int main()
 	sf::RenderWindow window(sf::VideoMode(WINDOW_WIDTH, WINDOW_HEIGHT), "2D CLIENT");
 	g_window = &window;
 
-	while (window.isOpen())
-	{
+	while (window.isOpen()) {
 		sf::Event event;
-		while (window.pollEvent(event))
-		{
-			if (event.type == sf::Event::Closed)
+		while (window.pollEvent(event)) {
+			if (event.type == sf::Event::Closed) {
 				window.close();
+			}
+
 			if (event.type == sf::Event::KeyPressed) {
-				int direction = -1;
+				int32_t direction = -1;
 				switch (event.key.code) {
 				case sf::Keyboard::Left:
 					direction = 2;
 					break;
+
 				case sf::Keyboard::Right:
 					direction = 3;
 					break;
+
 				case sf::Keyboard::Up:
 					direction = 0;
 					break;
+
 				case sf::Keyboard::Down:
 					direction = 1;
 					break;
+
 				case sf::Keyboard::LControl:
 				{
 					cs_packet_attack p;
@@ -201,8 +201,12 @@ int main()
 					send_packet(&p);
 				}
 				break;
+
 				case sf::Keyboard::Escape:
 					window.close();
+					break;
+
+				default:
 					break;
 				}
 
@@ -213,7 +217,6 @@ int main()
 					p.direction = direction;
 					send_packet(&p);
 				}
-
 			}
 		}
 

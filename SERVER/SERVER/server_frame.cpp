@@ -84,6 +84,16 @@ void ServerFrame::wakeup_npc(int32_t npc_id, int32_t waker) {
 	add_timer_event(npc_id, 1s, EV_RANDOM_MOVE, 0);
 }
 
+void ServerFrame::send_chat_packet_to_every_one(int32_t sender, std::string_view message) {
+	for (auto [id, session] : _sessions) {
+		if (is_npc(id) or nullptr == session) {
+			continue;
+		}
+		
+		session->send_chat_packet(sender, message.data());
+	}
+}
+
 void ServerFrame::run() {
 	WSADATA WSAData;
 	if (0 != ::WSAStartup(MAKEWORD(2, 2), &WSAData)) {
@@ -338,6 +348,8 @@ void ServerFrame::worker_thread() {
 			break;
 		}
 	}
+
+	finish_thread();
 }
 
 void ServerFrame::timer_thread() {
@@ -382,6 +394,8 @@ void ServerFrame::timer_thread() {
             break;
         }
 	}
+
+	finish_thread();
 }
 
 void ServerFrame::db_thread() {
