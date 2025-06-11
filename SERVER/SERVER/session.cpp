@@ -13,7 +13,7 @@ bool Session::is_player() {
 
 bool Session::is_npc() {
 	return _id >= MAX_USER;
-}
+}	
 
 bool Session::is_active() {
 	return _is_active;
@@ -274,7 +274,7 @@ void Session::attack_near_area() {
 
 	auto [x, y] = get_position();
 
-	send_chat_packet(_id, "ATTACK!");
+	send_chat_packet(SYSTEM_ID, "ATTACK!");
 	std::vector<int32_t> attacked_npc{ };
 	for (auto cl : old_vlist) {
 		auto client = g_server.get_session(cl);
