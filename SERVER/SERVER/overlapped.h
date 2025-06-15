@@ -21,14 +21,14 @@ public:
 		_wsabuf.len = BUF_SIZE;
 		_wsabuf.buf = _send_buf;
 		_comp_type = OP_RECV;
-		::ZeroMemory(&_over, sizeof(_over));
+		::memset(&_over, 0, sizeof(_over));
 	}
 
 	OverExp(char* packet) {
 		auto size = static_cast<unsigned char>(packet[0]);
 		_wsabuf.len = size;
 		_wsabuf.buf = _send_buf;
-		::ZeroMemory(&_over, sizeof(_over));
+		::memset(&_over, 0, sizeof(_over));
 		_comp_type = OP_SEND;
 		::memcpy(_send_buf, packet, size);
 	}

@@ -11,7 +11,7 @@ std::pair<bool, DB_USER_INFO> db_login(int32_t session_id, const char* id)
 	SQLINTEGER user_y{ };
 	SQLLEN cb_user_id = 0, cb_user_x = 0, cb_user_y = 0;
 
-	auto session = g_server.get_session(session_id);
+	auto session = g_server.get_server_object(session_id);
 	if (nullptr == session) {
 		return std::make_pair(false, user_info);
 	}
@@ -59,7 +59,7 @@ std::pair<bool, DB_USER_INFO> db_login(int32_t session_id, const char* id)
 
 void db_update_user_pos(int32_t session_id)
 {
-	auto session = g_server.get_session(session_id);
+	auto session = g_server.get_server_object(session_id);
 	if (nullptr == session) {
 		return;
 	}

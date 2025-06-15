@@ -1,93 +1,51 @@
 #include "pch.h"
 #include "session.h"
-#include "lua_api.h"
 
 Session::Session(SOCKET socket, int32_t id) 
-	: _socket{ socket }, _id{ id }, _name{ } { }
+	: ServerObject{ ServerObjectTag::SESSION, id }, _socket { socket } { }
 
 Session::~Session() { }
 
-bool Session::is_player() {
-	return _id < MAX_USER;
+void Session::lock_view_list() {
+	_view_list_lock.lock();
 }
 
-bool Session::is_npc() {
-	return _id >= MAX_USER;
-}	
-
-bool Session::is_active() {
-	return _is_active;
+void Session::unlock_view_list() {
+	_view_list_lock.unlock();
 }
 
-int16_t Session::get_x() {
-	return _x;
-}
-
-int16_t Session::get_y() {
-	return _y;
-}
-
-std::pair<int16_t, int16_t> Session::get_position() {
-	return std::make_pair(_x, _y);
-}
-
-std::string_view Session::get_name() {
-	return _name;
-}
-
-int32_t Session::get_hp() {
-	return _hp;
-}
-
-bool Session::try_respawn(int32_t max_hp) {
-	auto old_hp = _hp.load();
-	return _hp.compare_exchange_strong(old_hp, max_hp);
-}
-
-void Session::update_hp(int32_t diff) {
-	_hp.fetch_add(diff);
-}
-
-S_STATE Session::get_state() {
-	return _state;
-}
-
-void Session::update_position(int16_t x, int16_t y) {
-	_x = x;
-	_y = y;
-}
-
-void Session::update_position_atomic(int16_t x, int16_t y) {
-	// TODO
-}
-
-void Session::change_state(S_STATE state) {
-	std::lock_guard state_guard{ _state_lock };
-	_state = state;
+const std::unordered_set<int32_t>& Session::get_view_list() {
+	return _view_list;
 }
 
 void Session::process_recv(int32_t num_bytes, OverExp* ex_over) {
-	int remain_data = num_bytes + _prev_remain;
-	char* p = ex_over->_send_buf;
-	while (remain_data > 0) {
-		int packet_size = p[0];
-		if (packet_size <= remain_data) {
-			process_packet(p);
-			p = p + packet_size;
-			remain_data = remain_data - packet_size;
+	int32_t total_size = num_bytes + _prev_remain;
+	if (0 == total_size) return;
+	uint8_t* end = reinterpret_cast<uint8_t*>(ex_over->_send_buf) + total_size;
+	uint8_t* iter = reinterpret_cast<uint8_t*>(ex_over->_send_buf);
+	while (true) {
+		uint8_t packet_size = iter[0];
+#ifdef _DEBUG // 의심되는 경우만 활성화
+		if (0 == packet_size) {
+			std::cout << std::format("Fatal Error: Packet Size is zero in Session [{}]\n", _id);
+			break;
 		}
-		else {
+#endif
+
+        process_packet(iter);
+		iter += packet_size;
+		if (end <= iter) {
 			break;
 		}
 	}
 
-	_prev_remain = remain_data;
-	if (remain_data > 0) {
-		memcpy(ex_over->_send_buf, p, remain_data);
+	_prev_remain = std::distance(iter, end);
+	if (_prev_remain > 0) {
+		std::memcpy(ex_over->_send_buf, iter, _prev_remain);
 	}
 }
 
-void Session::process_packet(char* packet) {
+void Session::process_packet(unsigned char* packet) {
 	switch (packet[1]) {
 	case C2S_P_LOGIN: {
 		cs_packet_login* p = reinterpret_cast<cs_packet_login*>(packet);
@@ -112,101 +70,16 @@ void Session::process_packet(char* packet) {
 	{
 		cs_packet_move* p = reinterpret_cast<cs_packet_move*>(packet);
 		_last_move_time = p->move_time;
-		int16_t x = _x;
-		int16_t y = _y;
+		int16_t dx{ };
+		int16_t dy{ };
 		switch (p->direction) {
-		case 0: if (y > 0) y--; break;
-		case 1: if (y < MAP_HEIGHT - 1) y++; break;
-		case 2: if (x > 0) x--; break;
-		case 3: if (x < MAP_WIDTH - 1) x++; break;
-		}
-		
-		if (false == g_server.is_in_map_area(x, y)) {
-			break;
+		case 0: dy = -1; break;
+		case 1: dy = 1; break;
+		case 2: dx = -1; break;
+		case 3: dx = 1; break;
 		}
 
-		int16_t old_x = _x;
-		int16_t old_y = _y;
-		_x = x;
-		_y = y;
-
-		// update view list & send move packet
-		auto [sector_x, sector_y] = g_sector.update_sector(_id, old_x, old_y, _x, _y);
-
-		std::unordered_set<int> near_list;
-		_view_list_lock.lock();
-		std::unordered_set<int> old_vlist = _view_list;
-		_view_list_lock.unlock();
-
-		// 주변 9개 섹터에 대해 검색s
-		for (auto dir = 0; dir < DIR_CNT; ++dir) {
-			auto [dx, dy] = DIRECTIONS[dir];
-			if (false == g_sector.is_valid_sector(sector_x + dx, sector_y + dy)) {
-				continue;
-			}
-
-			std::lock_guard sector_guard{ g_sector.get_sector_lock(sector_x + dx, sector_y + dy) };
-			for (auto cl : g_sector.get_sector(sector_x + dx, sector_y + dy)) {
-				auto client = g_server.get_session(cl);
-				if (nullptr == client) {
-					continue;
-				}
-
-				if (client->_state != ST_INGAME) {
-					continue;
-				}
-
-				if (client->_id == _id) {
-					continue;
-				}
-
-				if (g_server.can_see(_id, client->_id)) {
-					near_list.insert(client->_id);
-				}
-			}
-		}
-
-		send_move_packet(_id);
-
-		for (auto& pl : near_list) {
-			auto client = g_server.get_session(pl);
-			if (nullptr == client) {
-				continue;
-			}
-
-			if (g_server.is_pc(pl)) {
-				client->_view_list_lock.lock();
-				if (client->_view_list.count(_id)) {
-					client->_view_list_lock.unlock();
-					client->send_move_packet(_id);
-				}
-				else {
-					client->_view_list_lock.unlock();
-					client->send_add_player_packet(_id);
-				}
-			}
-			else {
-				g_server.wakeup_npc(pl, _id);
-			}
-
-			if (0 == old_vlist.count(pl)) {
-				send_add_player_packet(pl);
-			}
-		}
-
-		for (auto& pl : old_vlist) {
-			auto client = g_server.get_session(pl);
-			if (nullptr == client) {
-				continue;
-			}
-
-			if (0 == near_list.count(pl)) {
-				send_remove_player_packet(pl);
-				if (g_server.is_pc(pl)) {
-					client->send_remove_player_packet(_id);
-				}
-			}
-		}
+		do_player_move(dx, dy);
 	}
     break;
 
@@ -227,11 +100,6 @@ void Session::process_packet(char* packet) {
 	default:
 		break;
 	}
-}
-
-void Session::init_npc_name(std::string_view name) {
-	sprintf_s(_name, name.data());
-	_state = ST_INGAME;
 }
 
 void Session::login(std::string_view name, const DB_USER_INFO& user_info) {
@@ -255,35 +123,39 @@ void Session::login(std::string_view name, const DB_USER_INFO& user_info) {
 		}
 
 		std::lock_guard sector_guard{ g_sector.get_sector_lock(sector_x + dx, sector_y + dy) };
-		for (auto cl : g_sector.get_sector(sector_x + dx, sector_y + dy)) {
-			auto client = g_server.get_session(cl);
+		for (auto entity_id : g_sector.get_sector(sector_x + dx, sector_y + dy)) {
+			auto client = g_server.get_server_object(entity_id);
 			if (nullptr == client) {
 				continue;
 			}
 
 			{
-				std::lock_guard state_guard(client->_state_lock);
-				if (ST_INGAME != client->_state) {
+				std::lock_guard state_guard{ client->get_state_lock()};
+				if (ST_INGAME != client->get_state()) {
 					continue;
 				}
 			}
 
-			if (client->_id == _id) {
+			if (entity_id == _id) {
 				continue;
 			}
 
-			if (false == g_server.can_see(_id, client->_id)) {
+			if (false == g_server.can_see(_id, entity_id)) {
 				continue;
 			}
 
-			if (g_server.is_pc(client->_id)) {
-				client->send_add_player_packet(_id);
+			send_enter_packet(entity_id);
+			if (g_server.is_pc(entity_id)) {
+				auto player = cast_ptr<Session>(client);
+				if (nullptr != player) {
+					continue;
+				}
+
+                player->send_enter_packet(_id);
 			}
 			else {
-				g_server.wakeup_npc(client->_id, _id);
+				g_server.wakeup_npc(entity_id, _id);
 			}
-
-			send_add_player_packet(client->_id);
 		}
 	}
 }
@@ -298,7 +170,7 @@ void Session::attack_near_area() {
 	send_chat_packet(SYSTEM_ID, "ATTACK!");
 	std::vector<int32_t> attacked_npc{ };
 	for (auto cl : old_vlist) {
-		auto client = g_server.get_session(cl);
+		auto client = g_server.get_server_object(cl);
 		if (nullptr == client or ST_INGAME != client->get_state() or false == client->is_active()) {
 			continue;
 		}
@@ -319,242 +191,145 @@ void Session::attack_near_area() {
 	}
 }
 
-bool Session::initialize_lua_script() {
-	_lua_state = luaL_newstate();
-	luaL_openlibs(_lua_state);
-	lua_register(_lua_state, "API_send_message", API_send_message);
-	lua_register(_lua_state, "API_get_x", API_get_x);
-	lua_register(_lua_state, "API_get_y", API_get_y);
-
-	if (LUA_OK != luaL_loadfile(_lua_state, "npc.lua") or LUA_OK != lua_pcall(_lua_state, 0, 0, 0)) {
-		std::cout << lua_tostring(_lua_state, -1) << "\n";
-		lua_pop(_lua_state, 1);
-		return false;
-	}
-
-	lua_getglobal(_lua_state, "set_uid");
-	lua_pushnumber(_lua_state, _id);
-	lua_pcall(_lua_state, 1, 0, 0);
-	//lua_pop(L, 1);// eliminate set_uid from stack after call
-
-	return true;
-}
-
-void Session::update_active_state(bool active) {
-	_is_active = active;
-}
-
-bool Session::update_active_state_cas(bool& old_state, bool new_state) {
-	if (old_state == new_state) {
-		return false;
-	}
-
-	return std::atomic_compare_exchange_strong(&_is_active, &old_state, new_state);
-}
-
 void Session::disconnect() {
 	g_sector.erase(_id, _x, _y);
+
 	_view_list_lock.lock();
-	std::unordered_set<int32_t> vl = _view_list;
+	std::unordered_set<int32_t> view_list = _view_list;
 	_view_list_lock.unlock();
 
-	for (auto& p_id : vl) {
-		if (g_server.is_npc(p_id)) {
+	for (auto& entity_id : view_list) {
+		if (entity_id == _id) {
 			continue;
 		}
 
-		auto pl = g_server.get_session(p_id);
-		if (nullptr == pl) {
+		if (g_server.is_npc(entity_id)) {
+			continue;
+		}
+
+		auto session = g_server.get_server_object<Session>(entity_id);
+		if (nullptr == session) {
 			continue;
 		}
 
 		{
-			std::lock_guard state_guard{ pl->_state_lock };
-			if (ST_INGAME != pl->_state) {
+			std::lock_guard state_guard{ session->get_state_lock() };
+			if (ST_INGAME != session->get_state()) {
 				continue;
 			}
 		}
 
-		if (pl->_id == _id) {
-			continue;
-		}
-
-		pl->send_remove_player_packet(_id);
+		session->send_leave_packet(_id);
 	}
 
 	::closesocket(_socket);
 	change_state(ST_FREE);
 }
 
-void Session::do_npc_move(int32_t move_dx, int32_t move_dy) {
-	std::unordered_set<int> old_vl;
-	// 움직이기 전 섹터에 있던 오브젝트들 모두 추가
-	auto [prev_sector_x, prev_sector_y] = g_sector.get_sector_idx(_x, _y);
-	for (auto dir = 0; dir < DIR_CNT; ++dir) {
-		auto [dx, dy] = DIRECTIONS[dir];
-		if (false == g_sector.is_valid_sector(prev_sector_x + dx, prev_sector_y + dy)) {
-			continue;
-		}
+void Session::do_player_move(int32_t move_dx, int32_t move_dy) {
+	int16_t old_x = _x;
+	int16_t old_y = _y;
 
-		std::lock_guard sector_guard{ g_sector.get_sector_lock(prev_sector_x + dx, prev_sector_y + dy) };
-		for (auto cl : g_sector.get_sector(prev_sector_x + dx, prev_sector_y + dy)) {
-			auto obj = g_server.get_session(cl);
-			if (nullptr == obj) {
-				continue;
-			}
-
-			if (ST_INGAME != obj->_state) {
-				continue;
-			}
-
-			if (true == g_server.is_npc(obj->_id)) {
-				continue;
-			}
-
-			if (true == g_server.can_see(_id, obj->_id)) {
-				old_vl.insert(obj->_id);
-			}
-		}
-	}
-
-	int32_t x = _x + move_dx;
-	int32_t y = _y + move_dy;
-	if (false == g_server.is_in_map_area(x, y)) {
+	if (false == g_server.is_in_map_area(old_x + move_dx, old_y + move_dy)) {
 		return;
 	}
 
-	int32_t old_x = _x;
-	int32_t old_y = _y;
-	_x = x;
-	_y = y;
+	_x = old_x + move_dx;
+	_y = old_y + move_dy;
 
-	// 섹터 변경
-	auto [curr_sector_x, curr_sector_y] = g_sector.update_sector(_id, old_x, old_y, x, y);
+	// update view list & send move packet
+	auto [sector_x, sector_y] = g_sector.update_sector(_id, old_x, old_y, _x, _y);
 
-	// 움직인 후 섹터에 있는 오브젝트들 검사
-	std::unordered_set<int> new_vl;
+	std::unordered_set<int> near_list;
+	_view_list_lock.lock();
+	std::unordered_set<int> old_vlist = _view_list;
+	_view_list_lock.unlock();
+
+	// 주변 9개 섹터에 대해 검색s
 	for (auto dir = 0; dir < DIR_CNT; ++dir) {
 		auto [dx, dy] = DIRECTIONS[dir];
-		if (false == g_sector.is_valid_sector(curr_sector_x + dx, curr_sector_y + dy)) {
+		if (false == g_sector.is_valid_sector(sector_x + dx, sector_y + dy)) {
 			continue;
 		}
 
-		std::lock_guard sector_guard{ g_sector.get_sector_lock(curr_sector_x + dx, curr_sector_y + dy) };
-		for (auto cl : g_sector.get_sector(curr_sector_x + dx, curr_sector_y + dy)) {
-			auto obj = g_server.get_session(cl);
-			if (nullptr == obj) {
+		std::lock_guard sector_guard{ g_sector.get_sector_lock(sector_x + dx, sector_y + dy) };
+		for (auto client_id : g_sector.get_sector(sector_x + dx, sector_y + dy)) {
+			auto client = g_server.get_server_object(client_id);
+			if (nullptr == client) {
 				continue;
 			}
 
-			if (ST_INGAME != obj->_state) {
+			if (ST_INGAME != client->get_state()) {
 				continue;
 			}
 
-			if (true == g_server.is_npc(obj->_id)) {
+			if (client_id == _id) {
 				continue;
 			}
 
-			if (true == g_server.can_see(_id, obj->_id)) {
-				new_vl.insert(obj->_id);
+			if (g_server.can_see(_id, client_id)) {
+				near_list.insert(client_id);
 			}
 		}
 	}
 
-	for (auto pl : new_vl) {
-		auto client = g_server.get_session(pl);
+	send_move_packet(_id);
+
+	for (auto& pl : near_list) {
+		auto client = g_server.get_server_object(pl);
 		if (nullptr == client) {
 			continue;
 		}
 
-		if (0 == old_vl.count(pl)) {
-			// 플레이어의 시야에 등장
-			client->send_add_player_packet(_id);
-		}
-		else {
-			// 플레이어가 계속 보고 있음.
-			client->send_move_packet(_id);
-		}
-	}
+		if (g_server.is_pc(pl)) {
+			auto player = cast_ptr<Session>(client);
+			if (nullptr == player) {
+				continue;
+			}
 
-	for (auto pl : old_vl) {
-		auto client = g_server.get_session(pl);
-		if (nullptr == client) {
-			continue;
-		}
-
-		if (0 == new_vl.count(pl)) {
-			client->_view_list_lock.lock();
-			if (0 != client->_view_list.count(_id)) {
-				client->_view_list_lock.unlock();
-				client->send_remove_player_packet(_id);
+			player->_view_list_lock.lock();
+			if (player->_view_list.count(_id)) {
+				player->_view_list_lock.unlock();
+				player->send_move_packet(_id);
 			}
 			else {
-				client->_view_list_lock.unlock();
+				player->_view_list_lock.unlock();
+				player->send_enter_packet(_id);
 			}
 		}
-	}
-}
-
-void Session::do_npc_random_move() {
-	int32_t dx = 0;
-	int32_t dy = 0;
-	switch (rand() % 4) {
-	case 0: if (dx < (MAP_WIDTH - 1)) dx++; break;
-	case 1: if (dx > 0) dx--; break;
-	case 2: if (dy < (MAP_HEIGHT - 1)) dy++; break;
-	case 3: if (dy > 0) dy--; break;
-	}
-
-	do_npc_move(dx, dy);
-}
-
-void Session::process_event_player_move(int32_t target_obj) {
-	std::lock_guard lua_guard{ _lua_lock };
-	lua_getglobal(_lua_state, "event_player_move");
-	lua_pushnumber(_lua_state, target_obj);
-
-	if (LUA_OK != lua_pcall(_lua_state, 1, 0, 0)) {
-		std::cout << lua_tostring(_lua_state, -1) << "\n";
-		lua_pop(_lua_state, 1);
-		return;
-	}
-}
-
-void Session::process_event_npc_move() {
-	bool state{ false };
-	int32_t dx{ };
-	int32_t dy{ };
-	{
-		std::lock_guard lua_guard{ _lua_lock };
-		lua_getglobal(_lua_state, "event_do_npc_random_move");
-		if (LUA_OK != lua_pcall(_lua_state, 0, 0, 0)) {
-			std::cout << lua_tostring(_lua_state, -1) << "\n";
-			lua_pop(_lua_state, 1);
-			return;
+		else {
+			g_server.wakeup_npc(pl, _id);
 		}
 
-		lua_getglobal(_lua_state, "state_collision_with_player");
-		lua_getglobal(_lua_state, "move_dx");
-		lua_getglobal(_lua_state, "move_dy");
-		state = (bool)lua_toboolean(_lua_state, -3);
-		dx = (int32_t)lua_tointeger(_lua_state, -2);
-		dy = (int32_t)lua_tointeger(_lua_state, -1);
-
-		lua_pop(_lua_state, 3);
+		if (false == old_vlist.contains(pl)) {
+			send_enter_packet(pl);
+		}
 	}
 
-	if (false == state) {
-		do_npc_random_move();
-	}
-	else {
-		do_npc_move(dx, dy);
-	}
+	for (auto& pl : old_vlist) {
+		auto client = g_server.get_server_object(pl);
+		if (nullptr == client) {
+			continue;
+		}
 
-	g_server.add_timer_event(_id, 1s, EV_RANDOM_MOVE, 0);
+		if (true == near_list.contains(pl)) {
+			continue;
+		}
+
+		send_leave_packet(pl);
+		if (false == g_server.is_pc(pl)) {
+			continue;
+		}
+
+		auto player = cast_ptr<Session>(client);
+		if (nullptr == player) {
+			player->send_leave_packet(_id);
+		}
+	}
 }
 
 void Session::attack(int32_t client_id) {
-	auto session = g_server.get_session(client_id);
+	auto session = g_server.get_server_object(client_id);
 	if (nullptr == session) {
 		return;
 	}
@@ -567,7 +342,7 @@ void Session::attack(int32_t client_id) {
 		g_sector.erase(client_id, x, y);
 
 		send_chat_packet(SYSTEM_ID, std::format("YOU KILLED {}", session->get_name()).c_str());
-		send_remove_player_packet(client_id);
+		send_leave_packet(client_id);
 
 		g_server.add_timer_event(client_id, 5s, EV_MONSTER_RESPAWN, SYSTEM_ID);
 		return;
@@ -576,7 +351,12 @@ void Session::attack(int32_t client_id) {
 	send_chat_packet(client_id, std::format("ATTACKED BY {}", _name).c_str());
 	send_attack_packet(client_id);
 	if (g_server.is_pc(client_id)) {
-		session->send_chat_packet(client_id, std::format("ATTACKED BY {}", _name).c_str());
+		auto player = cast_ptr<Session>(session);
+		if (nullptr == player) {
+			return;
+		}
+
+		player->send_chat_packet(client_id, std::format("ATTACKED BY {}", _name).c_str());
 		send_attack_packet(client_id);
 	}
 }
@@ -618,7 +398,7 @@ void Session::send_login_fail_packet(char reason) {
 }
 
 void Session::send_move_packet(int32_t client_id) {
-	auto session = g_server.get_session(client_id);
+	auto session = g_server.get_server_object(client_id);
 	if (nullptr == session) {
 		return;
 	}
@@ -631,12 +411,12 @@ void Session::send_move_packet(int32_t client_id) {
 	p.type = S2C_P_MOVE;
 	p.x = x;
 	p.y = y;
-	p.move_time = session->_last_move_time;
+	p.move_time = session->get_move_time();
 	do_send(&p);
 }
 
-void Session::send_add_player_packet(int32_t client_id) {
-	auto session = g_server.get_session(client_id);
+void Session::send_enter_packet(int32_t client_id) {
+	auto session = g_server.get_server_object(client_id);
 	if (nullptr == session) {
 		return;
 	}
@@ -645,7 +425,8 @@ void Session::send_add_player_packet(int32_t client_id) {
 
 	sc_packet_enter enter_packet;
 	enter_packet.id = client_id;
-	strcpy_s(enter_packet.name, session->_name);
+	auto name_view = session->get_name();
+	::strcpy_s(enter_packet.name, name_view.data());
 	enter_packet.size = sizeof(enter_packet);
 	enter_packet.type = S2C_P_ENTER;
 	enter_packet.x = x;
@@ -679,7 +460,7 @@ void Session::send_chat_packet(int32_t player_id, const char* message) {
 	do_send(&packet);
 }
 
-void Session::send_remove_player_packet(int32_t client_id) {
+void Session::send_leave_packet(int32_t client_id) {
 	{
 		std::lock_guard view_list_guard{ _view_list_lock };
 		if (false == _view_list.contains(client_id)) {
@@ -697,7 +478,7 @@ void Session::send_remove_player_packet(int32_t client_id) {
 }
 
 void Session::send_attack_packet(int32_t target) {
-	auto session = g_server.get_session(target);
+	auto session = g_server.get_server_object(target);
 	if (nullptr == session) {
 		return;
 	}

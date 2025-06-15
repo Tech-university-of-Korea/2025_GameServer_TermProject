@@ -135,15 +135,19 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="db_functions.cpp" />
+    <ClCompile Include="game_world.cpp" />
     <ClCompile Include="lua_api.cpp" />
+    <ClCompile Include="lua_npc.cpp" />
+    <ClCompile Include="npc.cpp" />
     <ClCompile Include="overlapped.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="sector.cpp" />
+    <ClCompile Include="server_entity.cpp" />
     <ClCompile Include="server_frame.cpp" />
-    <ClCompile Include="server_db.cpp" />
+    <ClCompile Include="main.cpp" />
     <ClCompile Include="session.cpp" />
     <ClCompile Include="db_util.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
@@ -155,20 +159,27 @@
     <ClInclude Include="db_functions.h" />
     <ClInclude Include="ebr.h" />
     <ClInclude Include="game_header.h" />
+    <ClInclude Include="game_world.h" />
     <ClInclude Include="include\lauxlib.h" />
     <ClInclude Include="include\lua.h" />
     <ClInclude Include="include\lua.hpp" />
     <ClInclude Include="include\luaconf.h" />
     <ClInclude Include="include\lualib.h" />
     <ClInclude Include="lua_api.h" />
+    <ClInclude Include="lua_npc.h" />
+    <ClInclude Include="npc.h" />
     <ClInclude Include="overlapped.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="sector.h" />
+    <ClInclude Include="server_entity.h" />
     <ClInclude Include="server_frame.h" />
+    <ClInclude Include="server_object_tags.h" />
     <ClInclude Include="session.h" />
+    <ClInclude Include="session_ebr.h" />
     <ClInclude Include="thread_utils.h" />
     <ClInclude Include="db_util.h" />
     <ClInclude Include="network_constants.h" />
+    <ClInclude Include="utils.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="npc.lua" />

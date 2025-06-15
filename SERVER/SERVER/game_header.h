@@ -14,15 +14,19 @@ constexpr char S2C_P_AVATAR_INFO = 1;
 constexpr char S2C_P_MOVE = 2;
 constexpr char S2C_P_ENTER = 3;
 constexpr char S2C_P_LEAVE = 4;
-constexpr char C2S_P_LOGIN = 5;
-constexpr char C2S_P_MOVE = 6;
 constexpr char S2C_P_CHAT = 7;
 constexpr char S2C_P_STAT_CHANGE = 8;
 constexpr char S2C_P_LOGIN_FAIL = 9;
 constexpr char S2C_P_ATTACK = 10;
-constexpr char C2S_P_ATTACK = 65;
-constexpr char C2S_P_CHAT = 66;
-constexpr char C2S_P_TELEPORT = 67;		// 동접 테스트 할 때
+constexpr char S2C_P_ENTER_PARTY = 11;
+constexpr char S2C_P_LEAVE_PARTY = 12;
+constexpr char S2C_P_UPDATE_PARTY_PLAYERS = 13;
+
+constexpr char C2S_P_LOGIN = 65;
+constexpr char C2S_P_MOVE = 66;
+constexpr char C2S_P_ATTACK = 67;
+constexpr char C2S_P_CHAT = 68;
+constexpr char C2S_P_TELEPORT = 69;		// 동접 테스트 할 때
 										// 시작마을의 HOTSPOT을 방지하기 위해 
 										// RANDOM TELEPORT할 때 사용
 

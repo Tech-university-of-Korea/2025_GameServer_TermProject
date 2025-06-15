@@ -1,55 +1,77 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Filter Include="소스 파일">
-      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
-      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
-    </Filter>
-    <Filter Include="헤더 파일">
-      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
-      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
-    </Filter>
-    <Filter Include="리소스 파일">
-      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
-      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
-    </Filter>
     <Filter Include="lua">
       <UniqueIdentifier>{2078960b-07bd-4140-9ffc-eb7c13685e23}</UniqueIdentifier>
     </Filter>
     <Filter Include="lua_script">
       <UniqueIdentifier>{964e31cf-853a-4bdf-92ef-906d29680d00}</UniqueIdentifier>
     </Filter>
+    <Filter Include="memory">
+      <UniqueIdentifier>{00723d61-49d3-48f9-bdf9-a5b75c501fe1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="thread">
+      <UniqueIdentifier>{94eec04c-1d3d-4d23-b348-200ea6f4d4de}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="database">
+      <UniqueIdentifier>{873b063b-d939-434a-b05e-47d120df9074}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="utils">
+      <UniqueIdentifier>{23e2ea55-5692-4636-a13d-481096bd056c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="network">
+      <UniqueIdentifier>{cf5a2c30-8975-4afe-94d3-b2b5a4bae8be}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="game">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="entity">
+      <UniqueIdentifier>{ef5ef088-0ffc-43d4-9189-73a217480cd7}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="server_db.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
-    <ClCompile Include="session.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
-    <ClCompile Include="pch.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
-    <ClCompile Include="sector.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
-    <ClCompile Include="overlapped.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
-    <ClCompile Include="server_frame.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
-    <ClCompile Include="lua_api.cpp">
-      <Filter>소스 파일</Filter>
+    <ClCompile Include="thread_utils.cpp">
+      <Filter>thread</Filter>
     </ClCompile>
     <ClCompile Include="db_functions.cpp">
-      <Filter>소스 파일</Filter>
+      <Filter>database</Filter>
     </ClCompile>
     <ClCompile Include="db_util.cpp">
-      <Filter>소스 파일</Filter>
+      <Filter>database</Filter>
     </ClCompile>
-    <ClCompile Include="thread_utils.cpp">
-      <Filter>소스 파일</Filter>
+    <ClCompile Include="lua_api.cpp">
+      <Filter>lua_script</Filter>
+    </ClCompile>
+    <ClCompile Include="pch.cpp">
+      <Filter>utils</Filter>
+    </ClCompile>
+    <ClCompile Include="overlapped.cpp">
+      <Filter>utils</Filter>
+    </ClCompile>
+    <ClCompile Include="game_world.cpp">
+      <Filter>game</Filter>
+    </ClCompile>
+    <ClCompile Include="sector.cpp">
+      <Filter>game</Filter>
+    </ClCompile>
+    <ClCompile Include="main.cpp">
+      <Filter>game</Filter>
+    </ClCompile>
+    <ClCompile Include="server_frame.cpp">
+      <Filter>game</Filter>
+    </ClCompile>
+    <ClCompile Include="session.cpp">
+      <Filter>entity</Filter>
+    </ClCompile>
+    <ClCompile Include="npc.cpp">
+      <Filter>entity</Filter>
+    </ClCompile>
+    <ClCompile Include="server_entity.cpp">
+      <Filter>entity</Filter>
+    </ClCompile>
+    <ClCompile Include="lua_npc.cpp">
+      <Filter>entity</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -69,40 +91,61 @@
       <Filter>lua</Filter>
     </ClInclude>
     <ClInclude Include="sector.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="session.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="pch.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="thread_utils.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="overlapped.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="game_header.h">
-      <Filter>헤더 파일</Filter>
+      <Filter>game</Filter>
     </ClInclude>
     <ClInclude Include="server_frame.h">
-      <Filter>헤더 파일</Filter>
+      <Filter>game</Filter>
     </ClInclude>
-    <ClInclude Include="lua_api.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="db_functions.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="db_util.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="network_constants.h">
-      <Filter>헤더 파일</Filter>
+    <ClInclude Include="game_world.h">
+      <Filter>game</Filter>
     </ClInclude>
     <ClInclude Include="ebr.h">
-      <Filter>헤더 파일</Filter>
+      <Filter>memory</Filter>
+    </ClInclude>
+    <ClInclude Include="session_ebr.h">
+      <Filter>memory</Filter>
+    </ClInclude>
+    <ClInclude Include="thread_utils.h">
+      <Filter>thread</Filter>
+    </ClInclude>
+    <ClInclude Include="db_functions.h">
+      <Filter>database</Filter>
+    </ClInclude>
+    <ClInclude Include="db_util.h">
+      <Filter>database</Filter>
+    </ClInclude>
+    <ClInclude Include="lua_api.h">
+      <Filter>lua_script</Filter>
+    </ClInclude>
+    <ClInclude Include="server_object_tags.h">
+      <Filter>utils</Filter>
+    </ClInclude>
+    <ClInclude Include="overlapped.h">
+      <Filter>utils</Filter>
+    </ClInclude>
+    <ClInclude Include="pch.h">
+      <Filter>utils</Filter>
+    </ClInclude>
+    <ClInclude Include="game_header.h">
+      <Filter>network</Filter>
+    </ClInclude>
+    <ClInclude Include="network_constants.h">
+      <Filter>network</Filter>
+    </ClInclude>
+    <ClInclude Include="session.h">
+      <Filter>entity</Filter>
+    </ClInclude>
+    <ClInclude Include="npc.h">
+      <Filter>entity</Filter>
+    </ClInclude>
+    <ClInclude Include="server_entity.h">
+      <Filter>entity</Filter>
+    </ClInclude>
+    <ClInclude Include="lua_npc.h">
+      <Filter>entity</Filter>
+    </ClInclude>
+    <ClInclude Include="utils.h">
+      <Filter>utils</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

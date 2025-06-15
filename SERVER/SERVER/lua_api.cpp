@@ -6,7 +6,7 @@ int32_t API_get_x(lua_State* L)
 	int32_t user_id = (int32_t)lua_tointeger(L, -1);
 	lua_pop(L, 2);
 
-	auto client = g_server.get_session(user_id);
+	auto client = g_server.get_server_object(user_id);
 	if (nullptr == client) {
 		return 0;
 	}
@@ -21,7 +21,7 @@ int32_t API_get_y(lua_State* L)
 	int32_t user_id = (int32_t)lua_tointeger(L, -1);
 	lua_pop(L, 2);
 
-	auto client = g_server.get_session(user_id);
+	auto client = g_server.get_server_object(user_id);
 	if (nullptr == client) {
 		return 0;
 	}
@@ -39,7 +39,7 @@ int32_t API_send_message(lua_State* L)
 
 	lua_pop(L, 4);
 
-	auto client = g_server.get_session(user_id);
+	auto client = g_server.get_server_object<Session>(user_id);
 	if (nullptr == client) {
 		return 0;
 	}

@@ -27,10 +27,10 @@
 #include "sector.h"
 #include "network_constants.h"
 #include "thread_utils.h"
-#include "ebr.h"
+#include "session_ebr.h"
 
 using namespace std::literals;
 
 extern ServerFrame g_server;
 extern Sectors g_sector;
-extern EBR<Session> g_session_ebr;
+extern SessionEbr g_session_ebr;

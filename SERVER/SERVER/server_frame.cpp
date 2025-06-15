@@ -1,5 +1,6 @@
-#include "pch.h"
+癤�#include "pch.h"
 #include "server_frame.h"
+#include "game_world.h"
 
 bool ServerFrame::is_pc(int32_t id) {
 	return id < MAX_USER;
@@ -22,7 +23,7 @@ bool ServerFrame::is_in_map_area(int16_t x, int16_t y) {
 	return (x > 0 and x < MAP_WIDTH and y > 0 and y < MAP_HEIGHT);
 }
 
-SessionPtr ServerFrame::get_session(int32_t session_id) {
+ServerObject* ServerFrame::get_server_object(int32_t session_id) {
     return _sessions.at(session_id);
 }
 
@@ -44,25 +45,25 @@ bool ServerFrame::can_see(int32_t from, int32_t to) {
 }
 
 void ServerFrame::disconnect(int32_t client_id) {
-	auto session = get_session(client_id);
+	auto session = get_server_object(client_id);
 	if (nullptr == session) {
 		return;
 	}
 
 	db_update_user_pos(client_id);
-	session->disconnect();
 
 	g_session_ebr.push_ptr(session);
 	_sessions.at(client_id) = nullptr;
 }
 
 void ServerFrame::add_timer_event(int32_t id, std::chrono::system_clock::duration delay, TIMER_EVENT_TYPE type, int32_t target_id) {
-	TIMER_EVENT ev{ id, std::chrono::system_clock::now() + delay, type, target_id };
+	auto excute_time = std::chrono::system_clock::now() + delay;
+	TimerEvent ev{ id, excute_time, type, target_id };
 	_timer_queue.push(ev);
 }
 
 void ServerFrame::wakeup_npc(int32_t npc_id, int32_t waker) {
-	auto npc = get_session(npc_id);
+	auto npc = get_server_object(npc_id);
 	if (nullptr == npc) {
 		return;
 	}
@@ -90,7 +91,8 @@ void ServerFrame::send_chat_packet_to_every_one(int32_t sender, std::string_view
 			continue;
 		}
 		
-		session->send_chat_packet(sender, message.data());
+		//ServerObject::cast_ptr<Session>(session);
+		//session->send_chat_packet(sender, message.data());
 	}
 }
 
@@ -142,17 +144,17 @@ void ServerFrame::run() {
 void ServerFrame::initialize_npc() {
 	std::cout << "NPC intialize begin.\n";
 	for (int i = MAX_USER; i < MAX_USER + NUM_MONSTER; ++i) {
-		auto new_session = new Session{ INVALID_SOCKET, i };
+		auto new_session = new Npc{ i };
 		_sessions.insert(std::make_pair(i, new_session));
 
-		auto npc = get_session(i);
+		auto npc = cast_ptr<Npc>(get_server_object(i));
 		npc->init_npc_name(std::format("NPC{}", i));
         npc->update_position(rand() % MAP_WIDTH, rand() % MAP_HEIGHT);
 
 		auto [x, y] = npc->get_position();
 		auto _ = g_sector.insert(i, x, y);
 
-		npc->initialize_lua_script();
+		//npc->initialize_lua_script();
 	}
 	std::cout << "NPC initialize end.\n";
 }
@@ -160,17 +162,17 @@ void ServerFrame::initialize_npc() {
 void ServerFrame::do_accept() {
 	int32_t client_id = _new_client_id++;
 	if (client_id != MAX_USER) {
-		auto new_session = g_session_ebr.pop_ptr(_client_socket, client_id);
+		auto new_session = g_session_ebr.pop_ptr<Session>(_client_socket, client_id);
 		_sessions.insert(std::make_pair(client_id, new_session));
 
-		auto session = get_session(client_id);
+		auto session = get_server_object<Session>(client_id);
 		if (nullptr == session) {
 			return;
 		}
 
 		session->change_state(ST_ALLOC);
 
-		CreateIoCompletionPort(reinterpret_cast<HANDLE>(_client_socket), _iocp_handle, client_id, 0);
+		::CreateIoCompletionPort(reinterpret_cast<HANDLE>(_client_socket), _iocp_handle, client_id, 0);
 
 		session->do_recv();
 		_client_socket = ::WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
@@ -200,10 +202,10 @@ void ServerFrame::worker_thread() {
 		DWORD num_bytes;
 		ULONG_PTR key;
 		WSAOVERLAPPED* over = nullptr;
-		BOOL ret = GetQueuedCompletionStatus(_iocp_handle, &num_bytes, &key, &over, INFINITE);
+		BOOL ret = ::GetQueuedCompletionStatus(_iocp_handle, &num_bytes, &key, &over, INFINITE);
 		OverExp* ex_over = reinterpret_cast<OverExp*>(over);
 
-		EBRGuard ebr_guard{ g_session_ebr, l_thread_id };
+		SessionEbrGuard ebr_guard{ g_session_ebr, l_thread_id };
 
 		if (FALSE == ret) {
 			if (ex_over->_comp_type == OP_ACCEPT) {
@@ -240,7 +242,7 @@ void ServerFrame::worker_thread() {
 		case OP_RECV: 
 		{
 			int32_t client_id = static_cast<int32_t>(key);
-			auto session = get_session(client_id);
+			auto session = get_server_object<Session>(client_id);
 			if (nullptr == session) {
 				break;
 			}
@@ -259,7 +261,7 @@ void ServerFrame::worker_thread() {
 		case OP_NPC_MOVE: 
 		{
 			int32_t npc_id = static_cast<int32_t>(key);
-			auto npc = get_session(npc_id);
+			auto npc = get_server_object<Npc>(npc_id);
 			if (nullptr == npc) {
 				delete ex_over;
 				break;
@@ -285,7 +287,7 @@ void ServerFrame::worker_thread() {
 						continue;
 					}
 
-					auto client = get_session(cl);
+					auto client = get_server_object(cl);
 					if (nullptr != client and ST_INGAME != client->get_state()) {
 						continue;
 					}
@@ -314,7 +316,7 @@ void ServerFrame::worker_thread() {
 		case OP_NPC_RESPAWN:
 		{
 			int32_t npc_id = static_cast<int32_t>(key);
-			auto npc = get_session(npc_id);
+			auto npc = get_server_object(npc_id);
 			if (nullptr == npc) {
 				delete ex_over;
 				break;
@@ -332,7 +334,7 @@ void ServerFrame::worker_thread() {
 		case OP_AI_HELLO: 
 		{
 			int32_t npc_id = static_cast<int32_t>(key);
-			auto npc = get_session(npc_id);
+			auto npc = get_server_object<LuaNpc>(npc_id);
 			if (nullptr == npc) {
 				delete ex_over;
 				break;
@@ -356,10 +358,7 @@ void ServerFrame::timer_thread() {
 	init_tls();
 
 	while (true) {
-		// 필요할 경우 EBR 적용
-		// 현재는 timer_thread에서 session 객체 사용 X -> EBR 적용 필요 X
-		
-		TIMER_EVENT ev;
+		TimerEvent ev;
 		auto current_time = std::chrono::system_clock::now();
 		if (false == _timer_queue.try_pop(ev)) {
             std::this_thread::sleep_for(1ms);
@@ -399,5 +398,7 @@ void ServerFrame::timer_thread() {
 }
 
 void ServerFrame::db_thread() {
-}
+	while (true) {
 
+	}
+}
