@@ -14,5 +14,10 @@ public:
     void do_npc_move(int32_t move_dx, int32_t move_dy);
     void do_npc_random_move();
 
+    bool check_player_in_view_range();
+
     virtual void process_event_npc_move();
+    virtual void process_game_event(GameEvent* event) override;
+
+    virtual void dispatch_npc_update(COMP_TYPE type);
 };

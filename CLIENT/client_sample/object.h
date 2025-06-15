@@ -24,6 +24,7 @@ public:
 	int32_t m_y{ };
 	int32_t m_hp{ };
 	int32_t m_max_hp{ };
+	int32_t m_exp{ };
 	int32_t m_level{ };
 	char name[MAX_ID_LENGTH]{ };
 

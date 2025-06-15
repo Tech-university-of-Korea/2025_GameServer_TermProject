@@ -1,7 +1,6 @@
 #pragma once
 
 #include "server_entity.h"
-#include "overlapped.h"
 #include "db_functions.h"
 
 constexpr int32_t TEMP_ATTACK_DAMAGE = 10;
@@ -16,10 +15,13 @@ public:
     void unlock_view_list();
     const std::unordered_set<int32_t>& get_view_list();
 
-    //bool try_respawn(int32_t max_hp);
+    virtual bool try_respawn(int32_t max_hp) override;
+    virtual void process_game_event(GameEvent* event) override;
 
     void process_recv(int32_t num_bytes, OverExp* ex_over);
     void process_packet(unsigned char* packet);
+
+    void process_kill_enemy_event(const GameEventKillEnemy* const);
 
     void login(std::string_view name, const DB_USER_INFO& user_info);
     void attack_near_area();
@@ -50,4 +52,7 @@ private:
     // VIEW
 	std::unordered_set<int> _view_list{ };
 	std::mutex _view_list_lock{ };
+
+    // info
+    std::mutex _level_lock{ };
 };

@@ -48,7 +48,14 @@ void LuaNpc::process_event_npc_move() {
 		do_npc_move(dx, dy);
 	}
 
-	g_server.add_timer_event(_id, 1s, EV_RANDOM_MOVE, 0);
+	g_server.add_timer_event(_id, 1s, OP_NPC_MOVE);
+}
+
+void LuaNpc::process_game_event(GameEvent* event) {
+}
+
+void LuaNpc::dispatch_npc_update(COMP_TYPE type) {
+	//process_event_player_move();
 }
 
 bool LuaNpc::initialize_lua_script() {

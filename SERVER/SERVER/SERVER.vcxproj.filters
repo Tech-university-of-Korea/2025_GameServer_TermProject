@@ -73,6 +73,12 @@
     <ClCompile Include="lua_npc.cpp">
       <Filter>entity</Filter>
     </ClCompile>
+    <ClCompile Include="party_system.cpp">
+      <Filter>game</Filter>
+    </ClCompile>
+    <ClCompile Include="game_event.cpp">
+      <Filter>game</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\lauxlib.h">
@@ -146,6 +152,12 @@
     </ClInclude>
     <ClInclude Include="utils.h">
       <Filter>utils</Filter>
+    </ClInclude>
+    <ClInclude Include="party_system.h">
+      <Filter>game</Filter>
+    </ClInclude>
+    <ClInclude Include="game_event.h">
+      <Filter>game</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

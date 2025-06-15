@@ -18,6 +18,40 @@ const std::unordered_set<int32_t>& Session::get_view_list() {
 	return _view_list;
 }
 
+bool Session::try_respawn(int32_t max_hp) {
+	_exp /= 2;
+	_x = rand() % MAP_WIDTH;
+	_y = rand() % MAP_HEIGHT;
+
+	update_active_state(true);
+	update_hp(max_hp);
+
+	return true;
+}
+
+void Session::process_game_event(GameEvent* event) {
+	auto type = event->event_type;
+	switch (type) {
+	case GameEventType::EVENT_KILL_ENEMY:
+	{
+		auto kill_event = cast_event<GameEventKillEnemy>(event);
+		process_kill_enemy_event(kill_event);
+		std::cout << "Level UP!!!\n";
+	}
+	break;
+
+	case GameEventType::EVENT_GET_DAMAGE:
+	{
+		auto damage_ev = cast_event<GameEventGetDamage>(event);
+		update_hp(-damage_ev->damage);
+	}
+	break;
+
+	default:
+		break;
+	}
+}
+
 void Session::process_recv(int32_t num_bytes, OverExp* ex_over) {
 	int32_t total_size = num_bytes + _prev_remain;
 	if (0 == total_size) return;
@@ -39,7 +73,7 @@ void Session::process_recv(int32_t num_bytes, OverExp* ex_over) {
 		}
 	}
 
-	_prev_remain = std::distance(iter, end);
+	_prev_remain = static_cast<int32_t>(std::distance(iter, end));
 	if (_prev_remain > 0) {
 		std::memcpy(ex_over->_send_buf, iter, _prev_remain);
 	}
@@ -99,6 +133,17 @@ void Session::process_packet(unsigned char* packet) {
 
 	default:
 		break;
+	}
+}
+
+void Session::process_kill_enemy_event(const GameEventKillEnemy* const event) {
+	std::lock_guard exp_guard{ _level_lock };
+	auto max_exp = 100;
+	_exp += event->exp;
+	auto diff_exp = _exp - max_exp;
+	if (0 < diff_exp) {
+		_exp = diff_exp;
+		_level += 1;
 	}
 }
 
@@ -245,34 +290,7 @@ void Session::do_player_move(int32_t move_dx, int32_t move_dy) {
 	std::unordered_set<int> old_vlist = _view_list;
 	_view_list_lock.unlock();
 
-	// 주변 9개 섹터에 대해 검색s
-	for (auto dir = 0; dir < DIR_CNT; ++dir) {
-		auto [dx, dy] = DIRECTIONS[dir];
-		if (false == g_sector.is_valid_sector(sector_x + dx, sector_y + dy)) {
-			continue;
-		}
-
-		std::lock_guard sector_guard{ g_sector.get_sector_lock(sector_x + dx, sector_y + dy) };
-		for (auto client_id : g_sector.get_sector(sector_x + dx, sector_y + dy)) {
-			auto client = g_server.get_server_object(client_id);
-			if (nullptr == client) {
-				continue;
-			}
-
-			if (ST_INGAME != client->get_state()) {
-				continue;
-			}
-
-			if (client_id == _id) {
-				continue;
-			}
-
-			if (g_server.can_see(_id, client_id)) {
-				near_list.insert(client_id);
-			}
-		}
-	}
-
+	update_view_list(near_list, sector_x, sector_y);
 	send_move_packet(_id);
 
 	for (auto& pl : near_list) {
@@ -329,36 +347,12 @@ void Session::do_player_move(int32_t move_dx, int32_t move_dy) {
 }
 
 void Session::attack(int32_t client_id) {
-	auto session = g_server.get_server_object(client_id);
-	if (nullptr == session) {
+	auto entity = g_server.get_server_object(client_id);
+	if (nullptr == entity) {
 		return;
 	}
 
-	session->update_hp(-TEMP_ATTACK_DAMAGE);
-	if (session->get_hp() <= 0) {
-		session->update_active_state(false);
-
-		auto [x, y] = session->get_position();
-		g_sector.erase(client_id, x, y);
-
-		send_chat_packet(SYSTEM_ID, std::format("YOU KILLED {}", session->get_name()).c_str());
-		send_leave_packet(client_id);
-
-		g_server.add_timer_event(client_id, 5s, EV_MONSTER_RESPAWN, SYSTEM_ID);
-		return;
-	}
-
-	send_chat_packet(client_id, std::format("ATTACKED BY {}", _name).c_str());
-	send_attack_packet(client_id);
-	if (g_server.is_pc(client_id)) {
-		auto player = cast_ptr<Session>(session);
-		if (nullptr == player) {
-			return;
-		}
-
-		player->send_chat_packet(client_id, std::format("ATTACKED BY {}", _name).c_str());
-		send_attack_packet(client_id);
-	}
+	entity->dispatch_game_event<GameEventGetDamage>(_id, TEMP_ATTACK_DAMAGE);
 }
 
 void Session::do_recv() {

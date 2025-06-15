@@ -134,6 +134,13 @@ void process_packet(char* ptr)
 	}
 	break;
 
+	case S2C_P_LEVEL_UP:
+	{
+		sc_packet_level_up* packet = reinterpret_cast<sc_packet_level_up*>(ptr);
+		players[packet->id].m_level = packet->level;
+		players[packet->id].m_exp = packet->exp;
+	}
+
 	default:
 		printf("Unknown PACKET type [%d]\n", ptr[1]);
 		break;

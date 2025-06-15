@@ -59,34 +59,8 @@ void Npc::do_npc_move(int32_t move_dx, int32_t move_dy) {
 	// 섹터 변경
 	auto [curr_sector_x, curr_sector_y] = g_sector.update_sector(_id, old_x, old_y, x, y);
 
-	std::unordered_set<int> new_vl;
-	for (auto dir = 0; dir < DIR_CNT; ++dir) {
-		auto [dx, dy] = DIRECTIONS[dir];
-		if (false == g_sector.is_valid_sector(curr_sector_x + dx, curr_sector_y + dy)) {
-			continue;
-		}
-
-		std::lock_guard sector_guard{ g_sector.get_sector_lock(curr_sector_x + dx, curr_sector_y + dy) };
-		for (auto cl : g_sector.get_sector(curr_sector_x + dx, curr_sector_y + dy)) {
-			auto obj = g_server.get_server_object(cl);
-			if (nullptr == obj) {
-				continue;
-			}
-
-			if (ST_INGAME != obj->get_state()) {
-				continue;
-			}
-
-			auto obj_id = obj->get_id();
-			if (true == g_server.is_npc(obj_id)) {
-				continue;
-			}
-
-			if (true == g_server.can_see(_id, obj_id)) {
-				new_vl.insert(obj_id);
-			}
-		}
-	}
+	std::unordered_set<int32_t> new_vl;
+	insert_player_view_list(new_vl, curr_sector_x, curr_sector_y);
 
 	for (auto pl : new_vl) {
 		auto client = g_server.get_server_object<Session>(pl);
@@ -136,8 +110,116 @@ void Npc::do_npc_random_move() {
 	do_npc_move(dx, dy);
 }
 
+bool Npc::check_player_in_view_range() {
+	auto [x, y] = get_position();
+	auto [sector_x, sector_y] = g_sector.get_sector_idx(x, y);
+	for (auto dir = 0; dir < DIR_CNT; ++dir) {
+		auto [dx, dy] = DIRECTIONS[dir];
+		if (false == g_sector.is_valid_sector(sector_x + dx, sector_y + dy)) {
+			continue;
+		}
+
+		std::lock_guard sector_guard{ g_sector.get_sector_lock(sector_x + dx, sector_y + dy) };
+		for (auto entity_id : g_sector.get_sector(sector_x + dx, sector_y + dy)) {
+			if (g_server.is_npc(entity_id)) {
+				continue;
+			}
+
+			auto entity = g_server.get_server_object(entity_id);
+			if (nullptr != entity and ST_INGAME != entity->get_state()) {
+				continue;
+			}
+
+			if (g_server.can_see(_id, entity_id)) {
+				return true;
+			}
+		}
+	}
+
+	return false;
+}
+
 void Npc::process_event_npc_move() { 
 	do_npc_random_move();
 
-	g_server.add_timer_event(_id, 1s, EV_RANDOM_MOVE, 0);
+	g_server.add_timer_event(_id, 1s, OP_NPC_MOVE);
+}
+
+void Npc::process_game_event(GameEvent* event) {
+	auto type = event->event_type;
+	switch (type) {
+	case GameEventType::EVENT_GET_DAMAGE:
+	{
+		auto damage_ev = cast_event<GameEventGetDamage>(event);
+		update_hp(-damage_ev->damage);
+
+		auto [x, y] = get_position();
+		auto [sector_x, sector_y] = g_sector.get_sector_idx(x, y);
+
+		std::unordered_set<int32_t> new_vl;
+		insert_player_view_list(new_vl, sector_x, sector_y);
+		for (auto pl : new_vl) {
+			auto client = g_server.get_server_object<Session>(pl);
+			if (nullptr == client) {
+				continue;
+			}
+
+            client->send_attack_packet(_id);
+			if (_hp <= 0) {
+				client->send_leave_packet(_id);
+			}
+		}
+
+		if (_hp <= 0) {
+            update_active_state(false);
+            g_sector.erase(_id, x, y);
+            g_server.add_timer_event(_id, 5s, OP_NPC_RESPAWN);
+			if (g_server.is_pc(damage_ev->sender)) {
+				auto player = g_server.get_server_object<Session>(damage_ev->sender);
+				if (nullptr == player) {
+					break;
+				}
+
+				player->dispatch_game_event<GameEventKillEnemy>(_id, 100);
+			}
+		}
+	}
+    break;
+
+	default:
+		break;
+	}
+}
+
+void Npc::dispatch_npc_update(COMP_TYPE type) {
+	switch (type) {
+	case OP_NPC_MOVE:
+	{
+		if (false == is_active()) {
+			return;
+		}
+
+		bool keep_alive = check_player_in_view_range();
+		if (true == keep_alive) {
+			process_event_npc_move();
+		}
+		else {
+			update_active_state(false);
+		}
+	}
+	break;
+
+	case OP_NPC_RESPAWN:
+	{
+		std::cout << std::format("Respawn npc: {}\n", _id);
+		if (true == try_respawn(100)) {
+			auto [x, y] = get_position();
+			g_sector.insert(_id, x, y);
+		}
+	}
+	break;
+
+	default:
+		break;
+	}
 }

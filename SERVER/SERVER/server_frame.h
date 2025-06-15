@@ -6,11 +6,6 @@
 
 using SessionPtr = Session*;
 
-enum TIMER_EVENT_TYPE { 
-    EV_RANDOM_MOVE,
-    EV_MONSTER_RESPAWN,
-};
-
 enum DB_EVENT_TYPE { 
     DB_LOGIN, 
     DB_UPDATE_USER_INFO
@@ -19,8 +14,8 @@ enum DB_EVENT_TYPE {
 struct TimerEvent {
     int32_t obj_id;
     std::chrono::system_clock::time_point wakeup_time;
-    TIMER_EVENT_TYPE event_id;
-    int32_t target_id;
+    COMP_TYPE op_type;
+    void* extra_info;
 
     constexpr bool operator<(const TimerEvent& other) const {
         return wakeup_time > other.wakeup_time;
@@ -47,7 +42,7 @@ public:
     bool can_see(int32_t from, int32_t to);
 
     void disconnect(int32_t client_id);
-    void add_timer_event(int32_t id, std::chrono::system_clock::duration delay, TIMER_EVENT_TYPE type, int32_t target_id);
+    void add_timer_event(int32_t id, std::chrono::system_clock::duration delay, COMP_TYPE type, void* extra_info=nullptr);
     void wakeup_npc(int32_t npc_id, int32_t waker);
 
     void send_chat_packet_to_every_one(int32_t sender, std::string_view message);

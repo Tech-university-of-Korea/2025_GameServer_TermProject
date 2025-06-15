@@ -56,9 +56,9 @@ void ServerFrame::disconnect(int32_t client_id) {
 	_sessions.at(client_id) = nullptr;
 }
 
-void ServerFrame::add_timer_event(int32_t id, std::chrono::system_clock::duration delay, TIMER_EVENT_TYPE type, int32_t target_id) {
+void ServerFrame::add_timer_event(int32_t id, std::chrono::system_clock::duration delay, COMP_TYPE type, void* extra_info) {
 	auto excute_time = std::chrono::system_clock::now() + delay;
-	TimerEvent ev{ id, excute_time, type, target_id };
+	TimerEvent ev{ id, excute_time, type, extra_info };
 	_timer_queue.push(ev);
 }
 
@@ -68,10 +68,9 @@ void ServerFrame::wakeup_npc(int32_t npc_id, int32_t waker) {
 		return;
 	}
 
-	OverExp* exover = new OverExp;
-	exover->_comp_type = OP_AI_HELLO;
-	exover->_ai_target_obj = waker;
-	::PostQueuedCompletionStatus(_iocp_handle, 1, npc_id, &exover->_over);
+	if (ServerObjectTag::LUA_NPC == npc->get_object_tag()) {
+        add_timer_event(npc_id, 0s, OP_AI_HELLO, reinterpret_cast<void*>(waker));
+	}
 
 	if (true == npc->is_active() or npc->get_hp() <= 0) {
 		return;
@@ -82,7 +81,7 @@ void ServerFrame::wakeup_npc(int32_t npc_id, int32_t waker) {
 		return;
 	}
 
-	add_timer_event(npc_id, 1s, EV_RANDOM_MOVE, 0);
+	add_timer_event(npc_id, 1s, OP_NPC_MOVE);
 }
 
 void ServerFrame::send_chat_packet_to_every_one(int32_t sender, std::string_view message) {
@@ -267,48 +266,7 @@ void ServerFrame::worker_thread() {
 				break;
 			}
 
-			if (false == npc->is_active()) {
-				delete ex_over;
-				break;
-			}
-
-			bool keep_alive = false;
-			auto [npc_x, npc_y] = npc->get_position();
-			auto [sector_x, sector_y] = g_sector.get_sector_idx(npc_x, npc_y);
-			for (auto dir = 0; dir < DIR_CNT; ++dir) {
-				auto [dx, dy] = DIRECTIONS[dir];
-				if (false == g_sector.is_valid_sector(sector_x + dx, sector_y + dy)) {
-					continue;
-				}
-
-				std::lock_guard sector_guard{ g_sector.get_sector_lock(sector_x + dx, sector_y + dy) };
-				for (auto cl : g_sector.get_sector(sector_x + dx, sector_y + dy)) {
-					if (is_npc(cl)) {
-						continue;
-					}
-
-					auto client = get_server_object(cl);
-					if (nullptr != client and ST_INGAME != client->get_state()) {
-						continue;
-					}
-
-					if (can_see(npc_id, cl)) {
-						keep_alive = true;
-						break;
-					}
-				}
-
-				if (true == keep_alive) {
-					break;
-				}
-			}
-
-			if (true == keep_alive) {
-				npc->process_event_npc_move();
-			}
-			else {
-				npc->update_active_state(false);
-			}
+			npc->dispatch_npc_update(ex_over->_comp_type);
 			delete ex_over;
 		}
         break;
@@ -316,17 +274,13 @@ void ServerFrame::worker_thread() {
 		case OP_NPC_RESPAWN:
 		{
 			int32_t npc_id = static_cast<int32_t>(key);
-			auto npc = get_server_object(npc_id);
+			auto npc = get_server_object<Npc>(npc_id);
 			if (nullptr == npc) {
 				delete ex_over;
 				break;
 			}
 
-			std::cout << std::format("Respawn npc: {}\n", npc_id);
-			if (true == npc->try_respawn(100)) {
-				auto [x, y] = npc->get_position();
-				g_sector.insert(npc_id, x, y);
-			}
+			npc->dispatch_npc_update(ex_over->_comp_type);
 			delete ex_over;
 		}
 		break;
@@ -340,10 +294,30 @@ void ServerFrame::worker_thread() {
 				break;
 			}
 
-			npc->process_event_player_move(ex_over->_ai_target_obj);
+			npc->process_event_player_move(reinterpret_cast<int64_t>(ex_over->extra_info));
 			delete ex_over;
 		}
         break;
+
+		case OP_GAME_EVENT:
+		{
+			int32_t entity_id = static_cast<int32_t>(key);
+			auto entity = get_server_object(entity_id);
+			if (nullptr == entity) {
+				delete ex_over;
+				break;
+			}
+
+			auto event = reinterpret_cast<GameEvent*>(ex_over->extra_info);
+			if (nullptr == event) {
+				std::cout << "try process NULL GameEvent!!\n";
+			}
+			entity->process_game_event(event);
+
+			delete event;
+			delete ex_over;
+		}
+		break;
 
 		default:
 			std::cout << "ERROR: INVALID IO_OP\n";
@@ -372,26 +346,10 @@ void ServerFrame::timer_thread() {
             continue;
         }
 
-        switch (ev.event_id) {
-        case EV_RANDOM_MOVE:
-        {
-            OverExp* ov = new OverExp;
-            ov->_comp_type = OP_NPC_MOVE;
-            ::PostQueuedCompletionStatus(_iocp_handle, 1, ev.obj_id, &ov->_over);
-        }
-		break;
-
-		case EV_MONSTER_RESPAWN:
-		{
-			OverExp* ov = new OverExp;
-			ov->_comp_type = OP_NPC_RESPAWN;
-			::PostQueuedCompletionStatus(_iocp_handle, 1, ev.obj_id, &ov->_over);
-		}
-        break;
-
-        default:
-            break;
-        }
+        OverExp* ov = new OverExp;
+		ov->_comp_type = ev.op_type;
+		ov->extra_info = ev.extra_info;
+        ::PostQueuedCompletionStatus(_iocp_handle, 1, ev.obj_id, &ov->_over);
 	}
 
 	finish_thread();
