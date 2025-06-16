@@ -48,6 +48,19 @@ int64_t ServerObject::get_move_time() {
 	return _last_move_time;
 }
 
+DbUserInfo ServerObject::get_user_info() {
+	DbUserInfo ret;
+	ret.x = _x;
+	ret.y = _y;
+	ret.exp = _exp;
+	ret.level = _level;
+	return ret;
+}
+
+void ServerObject::init_name(std::string_view name) {
+	std::memcpy(_name, name.data(), name.size());
+}
+
 void ServerObject::lock_state() {
 	_state_lock.lock();
 }

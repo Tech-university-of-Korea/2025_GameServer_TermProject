@@ -52,7 +52,7 @@ void init_db()
 				SQLSetConnectAttr(h_dbc, SQL_LOGIN_TIMEOUT, (SQLPOINTER)5, 0);
 
 				// Connect to data source  
-				retcode = SQLConnect(h_dbc, (SQLWCHAR*)L"2020180006_2025_GameServer", SQL_NTS, (SQLWCHAR*)NULL, 0, NULL, 0);
+				retcode = SQLConnect(h_dbc, (SQLWCHAR*)L"2020180006_GameServer_TermProj", SQL_NTS, (SQLWCHAR*)NULL, 0, NULL, 0);
 
 				// Allocate statement handle  
 				if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {

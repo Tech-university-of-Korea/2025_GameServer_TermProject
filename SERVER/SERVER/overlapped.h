@@ -1,16 +1,23 @@
 #pragma once
 
+constexpr int32_t IOTYPE_IO = 0x10;
+constexpr int32_t IOTYPE_TIMER = 0x100;
+constexpr int32_t IOTYPE_DB = 0x1000;
+
 enum IoType : int32_t {
 	// OP_IO
-	OP_ACCEPT = 0x00, 
+	OP_ACCEPT = IOTYPE_IO,
 	OP_RECV, 
 	OP_SEND,
-	// OP_NPC
-	OP_NPC_MOVE = 0x10, 
+	// OP_TIMER
+	OP_NPC_MOVE = IOTYPE_TIMER,
 	OP_NPC_RESPAWN,
 	OP_AI_HELLO,
-	// OP_GAME_EVENT
-	OP_GAME_EVENT = 0x0100
+	OP_GAME_EVENT,
+	// OP_DB
+	OP_DB_LOGIN = IOTYPE_DB,
+	OP_DB_UPDATE_USER_INFO, 
+	OP_DB_CREATE_USER_INFO,
 };
 
 struct OverExp {

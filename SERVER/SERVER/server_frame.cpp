@@ -1,6 +1,5 @@
 ﻿#include "pch.h"
 #include "server_frame.h"
-#include "game_world.h"
 
 bool ServerFrame::is_pc(int32_t id) {
 	return id < MAX_USER;
@@ -44,14 +43,39 @@ bool ServerFrame::can_see(int32_t from, int32_t to) {
     return abs(from_y - to_y) <= VIEW_RANGE;
 }
 
+bool ServerFrame::can_move(int32_t x, int32_t y) {
+	if (x < 0 or x > MAP_WIDTH or y < 0 or y > MAP_HEIGHT) {
+		return false;
+	}
+
+	auto [sector_x, sector_y] = g_sector.get_sector_idx(x, y);
+	decltype(auto) sector = g_sector.get_sector(sector_x, sector_y);
+	{
+		std::lock_guard sector_guard{ g_sector.get_sector_lock(sector_x, sector_y) };
+		for (auto& entity_id : sector) {
+			auto entity = get_server_object(entity_id);
+			auto [entity_x, entity_y] = entity->get_position();
+			if (x == entity_x and y == entity_y) {
+				return false;
+			}
+		}
+	}
+
+	return true;
+}
+
 void ServerFrame::disconnect(int32_t client_id) {
 	auto session = get_server_object(client_id);
 	if (nullptr == session) {
 		return;
 	}
 
-	db_update_user_pos(client_id);
+	auto name_view = session->get_name();
+	if (false == is_dummy_client(name_view) or ST_INGAME != session->get_state()) {
+		add_db_event(client_id, OP_DB_UPDATE_USER_INFO, name_view, session->get_user_info());
+	}
 
+	session->change_state(ST_FREE);
 	g_session_ebr.push_ptr(session);
 	_sessions.at(client_id) = nullptr;
 }
@@ -63,6 +87,23 @@ void ServerFrame::add_timer_event(int32_t id, std::chrono::system_clock::duratio
 
 	std::lock_guard timer_map_guard{ _timer_map_lock };
 	_timer_event_map.insert(insert_pair);
+}
+
+void ServerFrame::add_db_event(int32_t id, IoType type, std::string_view name, std::optional<DbUserInfo> user_info) {
+	DataBaseEvent ev{ id, type };
+	if (false == name.empty()) {
+		::memset(ev.name, 0, MAX_ID_LENGTH);
+		::memcpy(ev.name, name.data(), name.length());
+	}
+
+	if (std::nullopt != user_info) {
+		ev.user_info = user_info.value();
+	}
+
+	_db_queue.push(ev);
+
+	_has_db_task.store(true);
+	_has_db_task.notify_one();
 }
 
 void ServerFrame::wakeup_npc(int32_t npc_id, int32_t waker) {
@@ -130,13 +171,14 @@ void ServerFrame::run() {
 	for (int i = 0; i < num_threads; ++i) {
 		worker_threads.emplace_back([this]() { worker_thread(); });
 	}
-
 	std::thread timer_thread{ [this]() { this->timer_thread(); } };
-	timer_thread.join();
+	std::thread db_thread{ [this]() { this->db_thread(); } };
 
 	for (auto& th : worker_threads) {
 		th.join();
 	}
+	timer_thread.join();
+	db_thread.join();
 
 	::cleanup_db();
 	::closesocket(_server_socket);
@@ -323,6 +365,23 @@ void ServerFrame::worker_thread() {
 		}
 		break;
 
+		case OP_DB_LOGIN:
+		{
+			int32_t session_id = static_cast<int32_t>(key);
+			auto session = get_server_object<Session>(session_id);
+			if (nullptr == session) {
+				delete ex_over;
+				break;
+			}
+
+			auto user_info = reinterpret_cast<DbUserInfo*>(ex_over->extra_info);
+			session->login(*user_info);
+
+			delete user_info;
+			delete ex_over;
+		}
+		break;
+
 		default:
 			std::cout << "ERROR: INVALID IO_OP\n";
 			break;
@@ -374,6 +433,63 @@ void ServerFrame::timer_thread() {
 }
 
 void ServerFrame::db_thread() {
+	init_db();
+	init_tls();
+
 	while (true) {
+		DataBaseEvent ev;
+		bool pop_result = _db_queue.try_pop(ev);
+		if (false == pop_result) {
+            _has_db_task.store(pop_result);
+            _has_db_task.wait(false);
+			continue;
+		}
+
+		SessionEbrGuard guard{ g_session_ebr, l_thread_id };
+		switch (ev.event) {
+		case OP_DB_LOGIN:
+		{
+			auto [login_result, user_info] = db_login(ev.obj_id);
+			if (false == login_result) {
+				DbUserInfo user_info;
+				user_info.x = rand() % MAP_WIDTH;
+				user_info.y = rand() % MAP_HEIGHT;
+				user_info.exp = 0;
+				user_info.level = 0;
+
+				if (false == db_create_new_user(ev.obj_id, user_info.x, user_info.y)) {
+					g_server.disconnect(ev.obj_id);
+					break;
+				}
+
+				OverExp* ov = new OverExp;
+				ov->_comp_type = OP_DB_LOGIN;
+				ov->extra_info = new DbUserInfo{ user_info };
+                ::PostQueuedCompletionStatus(_iocp_handle, 1, ev.obj_id, &ov->_over);
+			}
+			else {
+				OverExp* ov = new OverExp;
+				ov->_comp_type = OP_DB_LOGIN;
+				ov->extra_info = new DbUserInfo{ user_info };
+                ::PostQueuedCompletionStatus(_iocp_handle, 1, ev.obj_id, &ov->_over);
+			}
+		}
+		break;
+
+		case OP_DB_UPDATE_USER_INFO:
+		{
+			db_update_user_info(ev.name, ev.user_info);
+		}
+		break;
+
+		case OP_DB_CREATE_USER_INFO:
+			break;
+
+		default:
+			break;
+		}
 	}
+
+	finish_thread();
+	cleanup_db();
 }

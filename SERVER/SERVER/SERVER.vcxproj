@@ -136,7 +136,6 @@
   <ItemGroup>
     <ClCompile Include="db_functions.cpp" />
     <ClCompile Include="game_event.cpp" />
-    <ClCompile Include="game_world.cpp" />
     <ClCompile Include="lua_api.cpp" />
     <ClCompile Include="lua_npc.cpp" />
     <ClCompile Include="npc.cpp" />
@@ -162,7 +161,6 @@
     <ClInclude Include="ebr.h" />
     <ClInclude Include="game_event.h" />
     <ClInclude Include="game_header.h" />
-    <ClInclude Include="game_world.h" />
     <ClInclude Include="include\lauxlib.h" />
     <ClInclude Include="include\lua.h" />
     <ClInclude Include="include\lua.hpp" />

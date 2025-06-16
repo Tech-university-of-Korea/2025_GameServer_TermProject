@@ -1,5 +1,6 @@
 #pragma once
 
+#include "db_functions.h"
 #include "overlapped.h"
 #include "game_event.h"
 
@@ -34,6 +35,10 @@ public:
     std::string_view get_name();
     int32_t get_hp();
     int64_t get_move_time();
+
+    DbUserInfo get_user_info();
+
+    void init_name(std::string_view name);
 
     void lock_state();
     void unlock_state();

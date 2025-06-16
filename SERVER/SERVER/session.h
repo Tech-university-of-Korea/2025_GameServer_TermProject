@@ -1,7 +1,6 @@
 #pragma once
 
 #include "server_entity.h"
-#include "db_functions.h"
 
 constexpr int32_t TEMP_ATTACK_DAMAGE = 10;
 
@@ -23,7 +22,7 @@ public:
 
     void process_kill_enemy_event(const GameEventKillEnemy* const);
 
-    void login(std::string_view name, const DB_USER_INFO& user_info);
+    void login(const DbUserInfo& user_info);
     void attack_near_area();
 
     void disconnect();

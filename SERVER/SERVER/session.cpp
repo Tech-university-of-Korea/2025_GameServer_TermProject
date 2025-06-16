@@ -83,19 +83,14 @@ void Session::process_packet(unsigned char* packet) {
 	case C2S_P_LOGIN: {
 		cs_packet_login* p = reinterpret_cast<cs_packet_login*>(packet);
 		if (g_server.is_dummy_client(p->name)) {
-			DB_USER_INFO user_info{ rand() % MAP_WIDTH, rand() % MAP_HEIGHT };
-			login(p->name, user_info);
+			DbUserInfo user_info{ rand() % MAP_WIDTH, rand() % MAP_HEIGHT };
+			init_name(p->name);
+			login(user_info);
 			break;
 		}
 
-		auto [login_result, user_info] = db_login(_id, p->name);
-		if (false == login_result) {
-			send_login_fail_packet(LOGIN_FAIL_REASON_INVALID_ID);
-			g_server.disconnect(_id);
-			break;
-		}
-
-		login(p->name, user_info);
+		init_name(p->name);
+		g_server.add_db_event(_id, OP_DB_LOGIN);
 		break;
 	}
 
@@ -158,14 +153,19 @@ void Session::process_kill_enemy_event(const GameEventKillEnemy* const event) {
 	send_update_exp_packet(_id, curr_exp);
 }
 
-void Session::login(std::string_view name, const DB_USER_INFO& user_info) {
-    sprintf_s(_name, name.data());
-
+void Session::login(const DbUserInfo& user_info) {
 	{
         std::lock_guard state_guard{ _state_lock };
-		_x = user_info.x;
-		_y = user_info.y;
 		_state = ST_INGAME;
+	}
+
+	_x = user_info.x;
+	_y = user_info.y;
+
+	{
+		std::lock_guard level_guard{ _level_lock };
+		_exp = user_info.exp;
+		_level = user_info.level;
 	}
 
 	send_login_info_packet();
@@ -223,7 +223,6 @@ void Session::attack_near_area() {
 
 	auto [x, y] = get_position();
 
-	send_chat_packet(SYSTEM_ID, "ATTACK!");
 	std::vector<int32_t> attacked_npc{ };
 	for (auto cl : old_vlist) {
 		auto client = g_server.get_server_object(cl);
@@ -286,7 +285,7 @@ void Session::do_player_move(int32_t move_dx, int32_t move_dy) {
 	int16_t old_x = _x;
 	int16_t old_y = _y;
 
-	if (false == g_server.is_in_map_area(old_x + move_dx, old_y + move_dy)) {
+	if (false == g_server.can_move(old_x + move_dx, old_y + move_dy)) {
 		return;
 	}
 
@@ -363,6 +362,7 @@ void Session::attack(int32_t client_id) {
 		return;
 	}
 
+	send_chat_packet(SYSTEM_ID, std::format("ATTACK: {}", entity->get_name()).c_str());
 	entity->dispatch_game_event<GameEventGetDamage>(_id, TEMP_ATTACK_DAMAGE);
 }
 

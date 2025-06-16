@@ -27,7 +27,7 @@ std::pair<int32_t, int32_t> Sectors::update_sector(int32_t id, int32_t prev_x, i
 	if (prev_sector_x != curr_sector_x or prev_sector_y != curr_sector_y) {
 		void* lock_addr1 = &_sector_lock[prev_sector_x][prev_sector_y];
 		void* lock_addr2 = &_sector_lock[curr_sector_x][curr_sector_y];
-		// Dead lock 회피를 위한 순서 제어.
+		// Dead lock 회피를 위한 순서 제어. 2개의 같은 락에 대해선 항상 똑같은 순서
 		if (lock_addr1 < lock_addr2) {
 			std::lock_guard guard1{ _sector_lock[prev_sector_x][prev_sector_y] };
 			std::lock_guard guard2{ _sector_lock[curr_sector_x][curr_sector_y] };

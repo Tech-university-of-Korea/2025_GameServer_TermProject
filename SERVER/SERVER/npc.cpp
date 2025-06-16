@@ -15,6 +15,12 @@ void Npc::init_npc_name(std::string_view name) {
 }
 
 void Npc::do_npc_move(int32_t move_dx, int32_t move_dy) {
+	int32_t x = _x + move_dx;
+	int32_t y = _y + move_dy;
+	if (false == g_server.can_move(x, y)) {
+		return;
+	}
+
 	std::unordered_set<int> old_vl;
 	auto [prev_sector_x, prev_sector_y] = g_sector.get_sector_idx(_x, _y);
 	for (auto dir = 0; dir < DIR_CNT; ++dir) {
@@ -43,12 +49,6 @@ void Npc::do_npc_move(int32_t move_dx, int32_t move_dy) {
 				old_vl.insert(obj_id);
 			}
 		}
-	}
-
-	int32_t x = _x + move_dx;
-	int32_t y = _y + move_dy;
-	if (false == g_server.is_in_map_area(x, y)) {
-		return;
 	}
 
 	int32_t old_x = _x;
