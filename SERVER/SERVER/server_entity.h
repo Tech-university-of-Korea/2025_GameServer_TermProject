@@ -5,7 +5,7 @@
 #include "game_event.h"
 
 enum class ServerObjectTag {
-    SESSION, NPC, LUA_NPC, CNT
+    SESSION, PEACE_NPC, AGRO_NPC, CNT
 };
 
 enum ServerObjectState {
@@ -14,10 +14,10 @@ enum ServerObjectState {
     ST_INGAME
 };
 
-class ServerObject abstract {
+class ServerEntity abstract {
 public:
-    ServerObject(ServerObjectTag tag, int32_t id);
-    virtual ~ServerObject();
+    ServerEntity(ServerObjectTag tag, int32_t id);
+    virtual ~ServerEntity();
 
 public:
     bool is_player();
@@ -34,7 +34,11 @@ public:
     std::pair<int16_t, int16_t> get_position();
     std::string_view get_name();
     int32_t get_hp();
+    int32_t get_max_hp();
     int64_t get_move_time();
+    int32_t get_level();
+    int32_t get_exp();
+    int32_t get_max_exp();
 
     DbUserInfo get_user_info();
 
@@ -61,13 +65,13 @@ public:
 
     template <typename Event, typename... Args> 
         requires std::derived_from<Event, GameEvent>
-    void dispatch_game_event(int32_t sender_id, Args&&... args) {
+    void dispatch_game_event(int32_t sender_id, std::chrono::system_clock::duration delay, Args&&... args) {
         auto event = new Event{ Event::type, sender_id, args... };
-        dispatch_event(event);
+        dispatch_event(event, delay);
     }
 
 private:
-    void dispatch_event(GameEvent* event);
+    void dispatch_event(GameEvent* event, std::chrono::system_clock::duration delay);
 
 public:
     // EBR
@@ -85,8 +89,10 @@ protected:
     char _name[MAX_ID_LENGTH]{ };
     int16_t _x{ 0 };
     int16_t _y{ 0 };
-    volatile int32_t _level{ 1 };
-    volatile int32_t _exp{ 0 };
+    int32_t _level{ 1 };
+    int32_t _exp{ 0 };
+    int32_t _max_exp{ };
+    int32_t _max_hp{ };
     std::atomic_int32_t _hp{ 100 };
 
     // NETWORK

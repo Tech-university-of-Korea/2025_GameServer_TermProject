@@ -151,6 +151,16 @@ void ProcessPacket(int ci, unsigned char packet[])
 	case S2C_P_ENTER: break;
 	case S2C_P_LEAVE: break;
 	case S2C_P_CHAT: break;
+	case S2C_P_LEVEL_UP: break;
+	case S2C_P_UPDATE_EXP: break;
+	case S2C_P_ATTACK: break;
+	case S2C_P_STAT_CHANGE: break;
+	case S2C_P_LOGIN_FAIL:
+	{
+		sc_packet_login_fail* fail = reinterpret_cast<sc_packet_login_fail*>(packet);
+		DisconnectClient(fail->id);
+	}
+	break;
 	case S2C_P_AVATAR_INFO:
 	{
 		g_clients[ci].connected = true;

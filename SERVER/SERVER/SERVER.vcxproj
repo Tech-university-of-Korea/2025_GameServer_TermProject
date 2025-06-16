@@ -137,7 +137,7 @@
     <ClCompile Include="db_functions.cpp" />
     <ClCompile Include="game_event.cpp" />
     <ClCompile Include="lua_api.cpp" />
-    <ClCompile Include="lua_npc.cpp" />
+    <ClCompile Include="agro_npc.cpp" />
     <ClCompile Include="npc.cpp" />
     <ClCompile Include="overlapped.cpp" />
     <ClCompile Include="party_system.cpp" />
@@ -145,6 +145,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="peace_npc.cpp" />
     <ClCompile Include="sector.cpp" />
     <ClCompile Include="server_entity.cpp" />
     <ClCompile Include="server_frame.cpp" />
@@ -167,11 +168,12 @@
     <ClInclude Include="include\luaconf.h" />
     <ClInclude Include="include\lualib.h" />
     <ClInclude Include="lua_api.h" />
-    <ClInclude Include="lua_npc.h" />
+    <ClInclude Include="agro_npc.h" />
     <ClInclude Include="npc.h" />
     <ClInclude Include="overlapped.h" />
     <ClInclude Include="party_system.h" />
     <ClInclude Include="pch.h" />
+    <ClInclude Include="peace_npc.h" />
     <ClInclude Include="sector.h" />
     <ClInclude Include="server_entity.h" />
     <ClInclude Include="server_frame.h" />

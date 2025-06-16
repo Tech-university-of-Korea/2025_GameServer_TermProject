@@ -64,7 +64,14 @@ void process_packet(char* ptr)
 			players[id].show();
 		}
 		else {
-			players[id] = Object{ *pieces, 256, 0, 64, 64 };
+			switch (my_packet->o_type) {
+			case 1:
+				players[id] = Object{ *pieces, 256, 0, 64, 64 };
+				break;
+			default:
+				players[id] = Object{ *pieces, 320, 0, 64, 64 };
+				break;
+			}
 			players[id].m_id = id;
 			players[id].m_hp = my_packet->hp;
 			players[id].m_max_hp = my_packet->max_hp;
@@ -130,37 +137,23 @@ void process_packet(char* ptr)
 	}
 	break;
 
-	case S2C_P_ATTACK:
+	case S2C_P_STAT_CHANGE:
 	{
-		sc_packet_attack* packet = reinterpret_cast<sc_packet_attack*>(ptr);
-		players[packet->id].m_hp = packet->hp;
-	}
-	break;
-
-	case S2C_P_LEVEL_UP:
-	{
-		sc_packet_level_up* packet = reinterpret_cast<sc_packet_level_up*>(ptr);
-		if (packet->id == g_myid) {
+		sc_packet_stat_change* packet = reinterpret_cast<sc_packet_stat_change*>(ptr);
+		int id = packet->id;
+		if (id == g_myid) {
+			avatar.m_hp = packet->hp;
+            avatar.m_max_hp = packet->max_hp;
 			avatar.m_exp = packet->exp;
 			avatar.m_max_exp = packet->max_exp;
-			avatar.m_level = packet->level;
+            avatar.m_level = packet->level;
 		}
 		else {
-			players[packet->id].m_exp = packet->exp;
-			players[packet->id].m_max_exp = packet->max_exp;
-			players[packet->id].m_level = packet->level;
-		}
-	}
-	break;
-	
-	case S2C_P_UPDATE_EXP:
-	{
-		sc_packet_update_exp* packet = reinterpret_cast<sc_packet_update_exp*>(ptr);
-		if (packet->id == g_myid) {
-			avatar.m_exp = packet->exp;
-		}
-		else {
-			players[packet->id].m_exp = packet->exp;
+			players[id].m_hp = packet->hp;
+			players[id].m_max_hp = packet->max_hp;
+			players[id].m_exp = packet->exp;
+			players[id].m_max_exp = packet->max_exp;
+			players[id].m_level = packet->level;
 		}
 	}
 	break;

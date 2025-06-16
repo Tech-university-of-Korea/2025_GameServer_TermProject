@@ -2,7 +2,7 @@
 #include "session.h"
 
 Session::Session(SOCKET socket, int32_t id) 
-	: ServerObject{ ServerObjectTag::SESSION, id }, _socket { socket } { }
+	: ServerEntity{ ServerObjectTag::SESSION, id }, _socket { socket } { }
 
 Session::~Session() { }
 
@@ -20,11 +20,12 @@ const std::unordered_set<int32_t>& Session::get_view_list() {
 
 bool Session::try_respawn(int32_t max_hp) {
 	_exp /= 2;
-	_x = rand() % MAP_WIDTH;
-	_y = rand() % MAP_HEIGHT;
+	_hp = max_hp;
+	auto dx = rand() % MAP_WIDTH - _x;
+	auto dy = rand() % MAP_HEIGHT - _y;
+	do_player_move(dx, dy);
 
 	update_active_state(true);
-	update_hp(max_hp);
 
 	return true;
 }
@@ -36,13 +37,55 @@ void Session::process_game_event(GameEvent* event) {
 	{
 		auto kill_event = cast_event<GameEventKillEnemy>(event);
 		process_kill_enemy_event(kill_event);
+
+		send_chat_packet(SYSTEM_ID, std::format("Defeated Monster. Gained {} EXP.", kill_event->exp).c_str());
 	}
 	break;
 
 	case GameEventType::EVENT_GET_DAMAGE:
 	{
+		if (false == is_active()) {
+			break;
+		}
+
 		auto damage_ev = cast_event<GameEventGetDamage>(event);
+		auto sender = g_server.get_server_object(damage_ev->sender);
+		if (nullptr == sender) {
+			break;
+		}
+
+		send_chat_packet(SYSTEM_ID, std::format("You took {} damage from {}'s attack.", damage_ev->damage, sender->get_name().data()).c_str());
 		update_hp(-damage_ev->damage);
+
+		if (_hp <= 0) {
+			bool expected = true;
+			if (false == update_active_state_cas(expected, false)) {
+				break;
+			}
+			try_respawn(_max_hp);
+		}
+
+		_view_list_lock.lock();
+		std::unordered_set<int> old_vlist = _view_list;
+		_view_list_lock.unlock();
+
+		send_stat_change_packet(_id);
+		for (auto& entity_id : old_vlist) {
+			auto session = g_server.get_server_object<Session>(entity_id);
+			if (nullptr == session) {
+				continue;
+			}
+
+			session->send_stat_change_packet(_id);
+		}
+	}
+	break;
+
+	case GameEventType::EVENT_HEAL:
+	{
+		auto heal_ev = cast_event<GameEventHeal>(event);
+		update_hp(heal_ev->heal_point);
+		dispatch_game_event<GameEventHeal>(_id, 5s, _level * 5);
 	}
 	break;
 
@@ -131,29 +174,24 @@ void Session::process_packet(unsigned char* packet) {
 }
 
 void Session::process_kill_enemy_event(const GameEventKillEnemy* const event) {
-	auto max_exp = 100;
 	_level_lock.lock();
 	_exp += event->exp;
-    auto curr_exp = _exp;
-	auto diff_exp = curr_exp - max_exp;
+	auto diff_exp = _exp - _max_exp;
 	if (0 <= diff_exp) {
-		_exp = diff_exp % max_exp;
-		curr_exp = _exp;
+		_exp = diff_exp % _max_exp;
 
-		_level += diff_exp / max_exp + 1;
-
-		auto curr_level = _level;
-		_level_lock.unlock();
-
-		send_level_up_packet(_id, curr_exp, max_exp, curr_level);
-		return;
+		_level += diff_exp / _max_exp + 1;
+		_max_exp = _level * 100;
+		_hp = _max_hp;
 	}
 	_level_lock.unlock();
 
-	send_update_exp_packet(_id, curr_exp);
+	send_stat_change_packet(_id);
 }
 
 void Session::login(const DbUserInfo& user_info) {
+	update_active_state(true);
+
 	{
         std::lock_guard state_guard{ _state_lock };
 		_state = ST_INGAME;
@@ -168,7 +206,11 @@ void Session::login(const DbUserInfo& user_info) {
 		_level = user_info.level;
 	}
 
-	send_login_info_packet();
+	_max_hp = _level * 100;
+	_hp = _max_hp;
+	_max_exp = _level * _level * 100;
+
+	send_avatar_packet();
 
 	// 주변 9개 섹터 모두 검색
 	auto [sector_x, sector_y] = g_sector.insert(_id, _x, _y);
@@ -214,6 +256,8 @@ void Session::login(const DbUserInfo& user_info) {
 			}
 		}
 	}
+
+	dispatch_game_event<GameEventHeal>(_id, 5s, _level * 5);
 }
 
 void Session::attack_near_area() {
@@ -362,8 +406,9 @@ void Session::attack(int32_t client_id) {
 		return;
 	}
 
-	send_chat_packet(SYSTEM_ID, std::format("ATTACK: {}", entity->get_name()).c_str());
-	entity->dispatch_game_event<GameEventGetDamage>(_id, TEMP_ATTACK_DAMAGE);
+	send_chat_packet(SYSTEM_ID, std::format("hit {} and dealt {} damage", entity->get_name(), _level * _level * 2).c_str());
+	auto damage = rand() % ATTACK_DAMAGE_RANGE + _level;
+	entity->dispatch_game_event<GameEventGetDamage>(_id, 0s, damage);
 }
 
 void Session::do_recv() {
@@ -381,19 +426,19 @@ void Session::do_send(void* packet) {
 	::WSASend(_socket, &sdata->_wsabuf, 1, 0, 0, &sdata->_over, 0);
 }
 
-void Session::send_login_info_packet() {
-	sc_packet_avatar_info p;
-	p.id = _id;
-	p.size = sizeof(sc_packet_avatar_info);
-	p.type = S2C_P_AVATAR_INFO;
-	p.x = _x;
-	p.y = _y;
-	p.hp = _hp;
-	p.max_hp = 100;
-	p.level = 1;
-	p.exp = 0;
-	p.max_exp = 100;
-	do_send(&p);
+void Session::send_avatar_packet() {
+	sc_packet_avatar_info avatar_packet;
+	avatar_packet.id = _id;
+	avatar_packet.size = sizeof(sc_packet_avatar_info);
+	avatar_packet.type = S2C_P_AVATAR_INFO;
+	avatar_packet.x = _x;
+	avatar_packet.y = _y;
+	avatar_packet.hp = _hp;
+	avatar_packet.max_hp = _max_hp;
+	avatar_packet.level = _level;
+	avatar_packet.exp = _exp;
+	avatar_packet.max_exp = _max_exp;
+	do_send(&avatar_packet);
 }
 
 void Session::send_login_fail_packet(char reason) {
@@ -439,8 +484,9 @@ void Session::send_enter_packet(int32_t client_id) {
 	enter_packet.type = S2C_P_ENTER;
 	enter_packet.x = x;
 	enter_packet.y = y;
-	enter_packet.hp = _hp;
-	enter_packet.max_hp = 100;
+	enter_packet.hp = session->get_hp();
+	enter_packet.max_hp = session->get_max_hp();
+	enter_packet.o_type = static_cast<char>(session->get_object_tag());
 
 	{
         std::lock_guard view_list_guard{ _view_list_lock };
@@ -485,45 +531,23 @@ void Session::send_leave_packet(int32_t client_id) {
 	do_send(&p);
 }
 
-void Session::send_attack_packet(int32_t target) {
-	auto session = g_server.get_server_object(target);
+void Session::send_stat_change_packet(int32_t client_id) {
+	auto session = g_server.get_server_object(client_id);
 	if (nullptr == session) {
 		return;
 	}
 
 	auto hp = session->get_hp();
 
-	sc_packet_attack attack_packet;
-	attack_packet.id = target;
-	attack_packet.size = sizeof(attack_packet);
-	attack_packet.type = S2C_P_ATTACK;
-	attack_packet.hp = hp;
+	sc_packet_stat_change stat_packet;
+	stat_packet.id = client_id;
+	stat_packet.size = sizeof(stat_packet);
+	stat_packet.type = S2C_P_STAT_CHANGE;
+	stat_packet.hp = hp;
+	stat_packet.max_hp = session->get_max_hp();
+	stat_packet.exp = session->get_exp();
+	stat_packet.level = session->get_level();
+	stat_packet.max_exp = session->get_max_exp();
 
-	do_send(&attack_packet);
-}
-
-void Session::send_level_up_packet(int32_t client_id, int32_t exp, int32_t max_exp, int32_t level) {
-	sc_packet_level_up level_up_packet;
-	level_up_packet.id = client_id;
-	level_up_packet.size = sizeof(level_up_packet);
-	level_up_packet.type = S2C_P_LEVEL_UP;
-	level_up_packet.level = level;
-	level_up_packet.exp = exp;
-	level_up_packet.max_exp = max_exp;
-
-	do_send(&level_up_packet);
-}
-
-void Session::send_update_exp_packet(int32_t client_id, int32_t exp) {
-	if (client_id != _id) {
-		return;
-	}
-
-	sc_packet_update_exp update_exp_packet;
-	update_exp_packet.id = client_id;
-	update_exp_packet.size = sizeof(update_exp_packet);
-	update_exp_packet.type = S2C_P_UPDATE_EXP;
-	update_exp_packet.exp = exp;
-
-	do_send(&update_exp_packet);
+	do_send(&stat_packet);
 }

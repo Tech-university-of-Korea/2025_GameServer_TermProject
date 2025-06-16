@@ -1,54 +1,70 @@
 #include "pch.h"
 #include "server_entity.h"
 
-ServerObject::ServerObject(ServerObjectTag tag, int32_t id) 
+ServerEntity::ServerEntity(ServerObjectTag tag, int32_t id) 
 	: _tag{ tag }, _id{ id } { 
 	std::memset(_name, 0, MAX_ID_LENGTH);
 }
 
-ServerObject::~ServerObject() { }
+ServerEntity::~ServerEntity() { }
 
-bool ServerObject::is_player() {
+bool ServerEntity::is_player() {
 	return _id < MAX_USER;
 }
 
-bool ServerObject::is_npc() {
+bool ServerEntity::is_npc() {
 	return _id >= MAX_USER;
 }
 
-bool ServerObject::is_active() {
+bool ServerEntity::is_active() {
 	return _is_active;
 }
 
-int32_t ServerObject::get_id() {
+int32_t ServerEntity::get_id() {
 	return _id;
 }
 
-int16_t ServerObject::get_x() {
+int16_t ServerEntity::get_x() {
 	return _x;
 }
 
-int16_t ServerObject::get_y() {
+int16_t ServerEntity::get_y() {
 	return _y;
 }
 
-std::pair<int16_t, int16_t> ServerObject::get_position() {
+std::pair<int16_t, int16_t> ServerEntity::get_position() {
 	return std::make_pair(_x, _y);
 }
 
-std::string_view ServerObject::get_name() {
+std::string_view ServerEntity::get_name() {
 	return _name;
 }
 
-int32_t ServerObject::get_hp() {
+int32_t ServerEntity::get_hp() {
 	return _hp;
 }
 
-int64_t ServerObject::get_move_time() {
+int32_t ServerEntity::get_max_hp() {
+	return _max_hp;
+}
+
+int64_t ServerEntity::get_move_time() {
 	return _last_move_time;
 }
 
-DbUserInfo ServerObject::get_user_info() {
+int32_t ServerEntity::get_level() {
+	return _level;
+}
+
+int32_t ServerEntity::get_exp() {
+	return _exp;
+}
+
+int32_t ServerEntity::get_max_exp() {
+	return _max_exp;
+}
+
+DbUserInfo ServerEntity::get_user_info() {
 	DbUserInfo ret;
 	ret.x = _x;
 	ret.y = _y;
@@ -57,57 +73,61 @@ DbUserInfo ServerObject::get_user_info() {
 	return ret;
 }
 
-void ServerObject::init_name(std::string_view name) {
+void ServerEntity::init_name(std::string_view name) {
 	std::memcpy(_name, name.data(), name.size());
 }
 
-void ServerObject::lock_state() {
+void ServerEntity::lock_state() {
 	_state_lock.lock();
 }
 
-void ServerObject::unlock_state() {
+void ServerEntity::unlock_state() {
 	_state_lock.unlock();
 }
 
-bool ServerObject::try_respawn(int32_t max_hp) {
+bool ServerEntity::try_respawn(int32_t max_hp) {
 	auto old_hp = _hp.load();
 	return _hp.compare_exchange_strong(old_hp, max_hp);
 }
 
-void ServerObject::dispatch_event(GameEvent* event) {
-	g_server.add_timer_event(_id, 0s, OP_GAME_EVENT, event);
+void ServerEntity::dispatch_event(GameEvent* event, std::chrono::system_clock::duration delay) {
+	g_server.add_timer_event(_id, delay, OP_GAME_EVENT, event);
 }
 
-void ServerObject::update_hp(int32_t diff) {
+void ServerEntity::update_hp(int32_t diff) {
 	_hp.fetch_add(diff);
+
+	if (_max_hp < _hp) {
+		_hp = _max_hp;
+	}
 }
 
-ServerObjectTag ServerObject::get_object_tag() {
+ServerObjectTag ServerEntity::get_object_tag() {
 	return _tag;
 }
 
-std::mutex& ServerObject::get_state_lock() {
+std::mutex& ServerEntity::get_state_lock() {
 	return _state_lock;
 }
 
-ServerObjectState ServerObject::get_state() {
+ServerObjectState ServerEntity::get_state() {
 	return _state;
 }
 
-void ServerObject::update_position(int16_t x, int16_t y) {
+void ServerEntity::update_position(int16_t x, int16_t y) {
 	_x = x;
 	_y = y;
 }
 
-void ServerObject::update_position_atomic(int16_t x, int16_t y) {
+void ServerEntity::update_position_atomic(int16_t x, int16_t y) {
 	// TODO
 }
 
-void ServerObject::update_active_state(bool active) {
+void ServerEntity::update_active_state(bool active) {
 	_is_active = active;
 }
 
-bool ServerObject::update_active_state_cas(bool& old_state, bool new_state) {
+bool ServerEntity::update_active_state_cas(bool& old_state, bool new_state) {
 	if (old_state == new_state) {
 		return false;
 	}
@@ -115,16 +135,16 @@ bool ServerObject::update_active_state_cas(bool& old_state, bool new_state) {
 	return std::atomic_compare_exchange_strong(&_is_active, &old_state, new_state);
 }
 
-void ServerObject::update_move_time(int64_t move_time) {
+void ServerEntity::update_move_time(int64_t move_time) {
 	_last_move_time = move_time;
 }
 
-void ServerObject::change_state(ServerObjectState state) {
+void ServerEntity::change_state(ServerObjectState state) {
 	std::lock_guard state_guard{ _state_lock };
 	_state = state;
 }
 
-void ServerObject::update_view_list(std::unordered_set<int32_t>& view_list, int32_t sector_x, int32_t sector_y) {
+void ServerEntity::update_view_list(std::unordered_set<int32_t>& view_list, int32_t sector_x, int32_t sector_y) {
 	// 주변 9개 섹터에 대해 검색s
 	for (auto dir = 0; dir < DIR_CNT; ++dir) {
 		auto [dx, dy] = DIRECTIONS[dir];
@@ -154,7 +174,7 @@ void ServerObject::update_view_list(std::unordered_set<int32_t>& view_list, int3
 	}
 }
 
-void ServerObject::insert_player_view_list(std::unordered_set<int32_t>& view_list, int32_t sector_x, int32_t sector_y) {
+void ServerEntity::insert_player_view_list(std::unordered_set<int32_t>& view_list, int32_t sector_x, int32_t sector_y) {
 	for (auto dir = 0; dir < DIR_CNT; ++dir) {
 		auto [dx, dy] = DIRECTIONS[dir];
 		if (false == g_sector.is_valid_sector(sector_x + dx, sector_y + dy)) {

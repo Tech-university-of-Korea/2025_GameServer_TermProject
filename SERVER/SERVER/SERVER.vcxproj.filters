@@ -49,9 +49,6 @@
     <ClCompile Include="overlapped.cpp">
       <Filter>utils</Filter>
     </ClCompile>
-    <ClCompile Include="game_world.cpp">
-      <Filter>game</Filter>
-    </ClCompile>
     <ClCompile Include="sector.cpp">
       <Filter>game</Filter>
     </ClCompile>
@@ -70,7 +67,7 @@
     <ClCompile Include="server_entity.cpp">
       <Filter>entity</Filter>
     </ClCompile>
-    <ClCompile Include="lua_npc.cpp">
+    <ClCompile Include="agro_npc.cpp">
       <Filter>entity</Filter>
     </ClCompile>
     <ClCompile Include="party_system.cpp">
@@ -78,6 +75,9 @@
     </ClCompile>
     <ClCompile Include="game_event.cpp">
       <Filter>game</Filter>
+    </ClCompile>
+    <ClCompile Include="peace_npc.cpp">
+      <Filter>entity</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -100,9 +100,6 @@
       <Filter>game</Filter>
     </ClInclude>
     <ClInclude Include="server_frame.h">
-      <Filter>game</Filter>
-    </ClInclude>
-    <ClInclude Include="game_world.h">
       <Filter>game</Filter>
     </ClInclude>
     <ClInclude Include="ebr.h">
@@ -144,7 +141,7 @@
     <ClInclude Include="server_entity.h">
       <Filter>entity</Filter>
     </ClInclude>
-    <ClInclude Include="lua_npc.h">
+    <ClInclude Include="agro_npc.h">
       <Filter>entity</Filter>
     </ClInclude>
     <ClInclude Include="utils.h">
@@ -155,6 +152,9 @@
     </ClInclude>
     <ClInclude Include="game_event.h">
       <Filter>game</Filter>
+    </ClInclude>
+    <ClInclude Include="peace_npc.h">
+      <Filter>entity</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

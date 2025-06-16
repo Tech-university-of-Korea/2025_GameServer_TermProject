@@ -22,7 +22,7 @@ bool ServerFrame::is_in_map_area(int16_t x, int16_t y) {
 	return (x > 0 and x < MAP_WIDTH and y > 0 and y < MAP_HEIGHT);
 }
 
-ServerObject* ServerFrame::get_server_object(int32_t session_id) {
+ServerEntity* ServerFrame::get_server_object(int32_t session_id) {
     return _sessions.at(session_id);
 }
 
@@ -54,6 +54,10 @@ bool ServerFrame::can_move(int32_t x, int32_t y) {
 		std::lock_guard sector_guard{ g_sector.get_sector_lock(sector_x, sector_y) };
 		for (auto& entity_id : sector) {
 			auto entity = get_server_object(entity_id);
+			if (nullptr == entity) {
+				continue;
+			}
+
 			auto [entity_x, entity_y] = entity->get_position();
 			if (x == entity_x and y == entity_y) {
 				return false;
@@ -65,7 +69,7 @@ bool ServerFrame::can_move(int32_t x, int32_t y) {
 }
 
 void ServerFrame::disconnect(int32_t client_id) {
-	auto session = get_server_object(client_id);
+	auto session = get_server_object<Session>(client_id);
 	if (nullptr == session) {
 		return;
 	}
@@ -75,7 +79,7 @@ void ServerFrame::disconnect(int32_t client_id) {
 		add_db_event(client_id, OP_DB_UPDATE_USER_INFO, name_view, session->get_user_info());
 	}
 
-	session->change_state(ST_FREE);
+	session->disconnect();
 	g_session_ebr.push_ptr(session);
 	_sessions.at(client_id) = nullptr;
 }
@@ -112,8 +116,8 @@ void ServerFrame::wakeup_npc(int32_t npc_id, int32_t waker) {
 		return;
 	}
 
-	if (ServerObjectTag::LUA_NPC == npc->get_object_tag()) {
-        add_timer_event(npc_id, 0s, OP_AI_HELLO, reinterpret_cast<void*>(waker));
+	if (ServerObjectTag::AGRO_NPC == npc->get_object_tag()) {
+        add_timer_event(npc_id, 0s, OP_NPC_CHECK_AGRO, reinterpret_cast<void*>(waker));
 	}
 
 	if (true == npc->is_active() or npc->get_hp() <= 0) {
@@ -125,7 +129,7 @@ void ServerFrame::wakeup_npc(int32_t npc_id, int32_t waker) {
 		return;
 	}
 
-	add_timer_event(npc_id, 1s, OP_NPC_MOVE);
+	add_timer_event(npc_id, NPC_MOVE_TIME, OP_NPC_MOVE);
 }
 
 void ServerFrame::send_chat_packet_to_every_one(int32_t sender, std::string_view message) {
@@ -162,8 +166,17 @@ void ServerFrame::run() {
 	_iocp_handle = ::CreateIoCompletionPort(INVALID_HANDLE_VALUE, 0, 0, 0);
 	::CreateIoCompletionPort(reinterpret_cast<HANDLE>(_server_socket), _iocp_handle, 9999, 0);
 	_client_socket = ::WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
+
 	_accept_over._comp_type = OP_ACCEPT;
-	::AcceptEx(_server_socket, _client_socket, _accept_over._send_buf, 0, addr_size + 16, addr_size + 16, 0, &_accept_over._over);
+	::AcceptEx(
+		_server_socket, 
+		_client_socket, 
+		_accept_over._send_buf, 
+		0, 
+		addr_size + 16, addr_size + 16, 
+		0, 
+		&_accept_over._over
+	);
 
 	std::vector<std::thread> worker_threads{ };
 	int32_t num_threads = std::thread::hardware_concurrency();
@@ -188,17 +201,30 @@ void ServerFrame::run() {
 void ServerFrame::initialize_npc() {
 	std::cout << "NPC intialize begin.\n";
 	for (int i = MAX_USER; i < MAX_USER + NUM_MONSTER; ++i) {
-		auto new_session = new Npc{ i };
-		_sessions.insert(std::make_pair(i, new_session));
+		auto random = rand() % 100;
+		if (random > 80) {
+			auto new_session = new AgroNpc{ i };
+			_sessions.insert(std::make_pair(i, new_session));
 
-		auto npc = cast_ptr<Npc>(get_server_object(i));
-		npc->init_npc_name(std::format("NPC{}", i));
-        npc->update_position(rand() % MAP_WIDTH, rand() % MAP_HEIGHT);
+			auto npc = cast_ptr<AgroNpc>(get_server_object(i));
+			npc->init_npc_name();
+			npc->update_position(rand() % MAP_WIDTH, rand() % MAP_HEIGHT);
 
-		auto [x, y] = npc->get_position();
-		auto _ = g_sector.insert(i, x, y);
+			auto [x, y] = npc->get_position();
+			auto _ = g_sector.insert(i, x, y);
+            npc->initialize_lua_script();
+		}
+		else {
+			auto new_session = new PeaceNpc{ i };
+			_sessions.insert(std::make_pair(i, new_session));
 
-		//npc->initialize_lua_script();
+			auto npc = cast_ptr<PeaceNpc>(get_server_object(i));
+			npc->init_npc_name();
+			npc->update_position(rand() % MAP_WIDTH, rand() % MAP_HEIGHT);
+
+			auto [x, y] = npc->get_position();
+			auto _ = g_sector.insert(i, x, y);
+		}
 	}
 	std::cout << "NPC initialize end.\n";
 }
@@ -303,21 +329,9 @@ void ServerFrame::worker_thread() {
 		}
 		break;
 
-		case OP_NPC_MOVE: 
-		{
-			int32_t npc_id = static_cast<int32_t>(key);
-			auto npc = get_server_object<Npc>(npc_id);
-			if (nullptr == npc) {
-				delete ex_over;
-				break;
-			}
-
-			npc->dispatch_npc_update(ex_over->_comp_type);
-			delete ex_over;
-		}
-        break;
-
+		case OP_NPC_MOVE:
 		case OP_NPC_RESPAWN:
+		case OP_NPC_CHECK_AGRO:
 		{
 			int32_t npc_id = static_cast<int32_t>(key);
 			auto npc = get_server_object<Npc>(npc_id);
@@ -326,24 +340,10 @@ void ServerFrame::worker_thread() {
 				break;
 			}
 
-			npc->dispatch_npc_update(ex_over->_comp_type);
+			npc->dispatch_npc_update(ex_over->_comp_type, ex_over->extra_info);
 			delete ex_over;
 		}
 		break;
-
-		case OP_AI_HELLO: 
-		{
-			int32_t npc_id = static_cast<int32_t>(key);
-			auto npc = get_server_object<LuaNpc>(npc_id);
-			if (nullptr == npc) {
-				delete ex_over;
-				break;
-			}
-
-			npc->process_event_player_move(reinterpret_cast<int64_t>(ex_over->extra_info));
-			delete ex_over;
-		}
-        break;
 
 		case OP_GAME_EVENT:
 		{
@@ -455,7 +455,7 @@ void ServerFrame::db_thread() {
 				user_info.x = rand() % MAP_WIDTH;
 				user_info.y = rand() % MAP_HEIGHT;
 				user_info.exp = 0;
-				user_info.level = 0;
+				user_info.level = 1;
 
 				if (false == db_create_new_user(ev.obj_id, user_info.x, user_info.y)) {
 					g_server.disconnect(ev.obj_id);

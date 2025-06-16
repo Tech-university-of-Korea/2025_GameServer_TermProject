@@ -2,9 +2,9 @@
 
 #include "server_entity.h"
 
-constexpr int32_t TEMP_ATTACK_DAMAGE = 10;
+constexpr int32_t ATTACK_DAMAGE_RANGE = 10;
 
-class Session : public ServerObject {
+class Session : public ServerEntity {
 public:
     Session(SOCKET socket, int32_t id);
     virtual ~Session();
@@ -34,15 +34,13 @@ public:
 	void do_recv();
 	void do_send(void* packet);
 
-	void send_login_info_packet();
+	void send_avatar_packet();
 	void send_login_fail_packet(char reason);
 	void send_move_packet(int32_t client_id);
 	void send_enter_packet(int32_t client_id);
 	void send_chat_packet(int32_t client_id, const char* mess);
     void send_leave_packet(int32_t client_id);
-    void send_attack_packet(int32_t target);
-    void send_level_up_packet(int32_t client_id, int32_t exp, int32_t max_exp, int32_t level);
-    void send_update_exp_packet(int32_t client_id, int32_t exp);
+    void send_stat_change_packet(int32_t client_id);
 
 private:
     // NETWORK 

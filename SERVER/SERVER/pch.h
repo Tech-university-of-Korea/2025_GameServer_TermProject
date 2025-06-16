@@ -31,6 +31,9 @@
 
 using namespace std::literals;
 
+inline constexpr auto NPC_MOVE_TIME = 500ms;
+inline constexpr auto NPC_RESPAWN_TIME = 30s;
+
 extern ServerFrame g_server;
 extern Sectors g_sector;
 extern SessionEbr g_session_ebr;

@@ -1,7 +1,8 @@
 #pragma once
 
 #include "session.h"
-#include "lua_npc.h"
+#include "agro_npc.h"
+#include "peace_npc.h"
 #include "overlapped.h"
 
 #include <map>
@@ -18,8 +19,8 @@ struct TimerEvent {
 struct DataBaseEvent {
     int32_t obj_id;
     IoType event;
-    char name[MAX_ID_LENGTH]; // for disconnect
-    DbUserInfo user_info;
+    char name[MAX_ID_LENGTH]; // for disconnect - 연결 종료시 DB에 업데이트 - 유저는 컨테이너 에서 삭제되므로 정보를 얻어야함
+    DbUserInfo user_info;     // for disconnect  - 정보를 세션 객체에서 곧바로 얻지말고 복사해놓자.
 };
 
 class ServerFrame {
@@ -33,7 +34,7 @@ public:
     bool is_dummy_client(std::string_view name);
     bool is_in_map_area(int16_t x, int16_t y);
 
-    ServerObject* get_server_object(int32_t session_id);
+    ServerEntity* get_server_object(int32_t session_id);
     bool can_see(int32_t from, int32_t to);
     bool can_move(int32_t x, int32_t y);
 
@@ -48,9 +49,9 @@ public:
 
 public:
     template <typename ObjectType> 
-        requires std::derived_from<ObjectType, ServerObject>
+        requires std::derived_from<ObjectType, ServerEntity>
     ObjectType* get_server_object(int32_t session_id) {
-        ServerObject* obj = get_server_object(session_id);
+        ServerEntity* obj = get_server_object(session_id);
         return cast_ptr<ObjectType>(obj);
     }
 
@@ -72,7 +73,7 @@ private:
     IoOver _accept_over{ };
 
     std::atomic_int32_t _new_client_id{ 0 };
-    Concurrency::concurrent_unordered_map<int32_t, ServerObject*> _sessions{ };
+    Concurrency::concurrent_unordered_map<int32_t, ServerEntity*> _sessions{ };
 
     std::mutex _timer_map_lock;
     std::multimap<std::chrono::system_clock::time_point, TimerEvent> _timer_event_map;

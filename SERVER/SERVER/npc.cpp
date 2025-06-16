@@ -1,18 +1,10 @@
 #include "pch.h"
 #include "npc.h"
 
-Npc::Npc(int32_t id) 
-	: ServerObject{ ServerObjectTag::NPC, id } { }
-
 Npc::Npc(ServerObjectTag tag, int32_t id) 
-	: ServerObject{ ServerObjectTag::LUA_NPC, id } { }
+	: ServerEntity{ tag, id } { }
 
 Npc::~Npc() { }
-
-void Npc::init_npc_name(std::string_view name) {
-	std::memcpy(_name, name.data(), name.size());
-	_state = ST_INGAME;
-}
 
 void Npc::do_npc_move(int32_t move_dx, int32_t move_dy) {
 	int32_t x = _x + move_dx;
@@ -139,10 +131,70 @@ bool Npc::check_player_in_view_range() {
 	return false;
 }
 
-void Npc::process_event_npc_move() { 
-	do_npc_random_move();
+void Npc::chase_target() {
+	auto player = g_server.get_server_object<Session>(_target_player);
+	if (nullptr == player) {
+		_target_player = SYSTEM_ID;
+		return;
+	}
 
-	g_server.add_timer_event(_id, 1s, OP_NPC_MOVE);
+	auto [x, y] = player->get_position();
+	auto diff_x = x - _x;
+	auto diff_y = y - _y;
+	if (1 >= std::abs(diff_x) + std::abs(diff_y)) {
+		attack();
+		return;
+	}
+	else if (1 == std::abs(diff_x) and 1 == std::abs(diff_y)) {
+		do_npc_move(1, 0);
+		return;
+	}
+	
+	auto dx = 0 == diff_x ? 0 : diff_x / std::abs(diff_x);
+	auto dy = 0 == diff_y ? 0 : diff_y / std::abs(diff_y);
+	do_npc_move(dx, dy);
+}
+
+void Npc::attack() {
+    std::unordered_set<int> view_list;
+	auto [x, y] = get_position();
+	auto [sector_x, sector_y] = g_sector.get_sector_idx(x, y);
+
+	insert_player_view_list(view_list, sector_x, sector_y);
+
+    for (auto entity_id : view_list) {
+        auto session = g_server.get_server_object<Session>(entity_id);
+        if (nullptr == session or ST_INGAME != session->get_state() or false == session->is_active()) {
+            continue;
+        }
+
+        auto [cl_x, cl_y] = session->get_position();
+        for (int32_t dir = 0; dir < DIR_CNT; ++dir) {
+            auto [dx, dy] = DIRECTIONS[dir];
+
+            auto attack_pos_x = x + dx;
+            auto attack_pos_y = y + dy;
+            if (attack_pos_x != cl_x or attack_pos_y != cl_y) {
+                continue;
+            }
+
+			auto damage = rand() % ATTACK_DAMAGE_RANGE + _level;
+			session->dispatch_game_event<GameEventGetDamage>(_id, 0s, damage);
+            break;
+        }
+    }
+}
+
+void Npc::process_event_npc_move() {
+	if (_target_player == SYSTEM_ID or _target_player >= MAX_USER) {
+		_target_player = SYSTEM_ID;
+        do_npc_random_move();
+	}
+	else {
+		chase_target();
+	}
+
+	g_server.add_timer_event(_id, NPC_MOVE_TIME, OP_NPC_MOVE);
 }
 
 void Npc::process_game_event(GameEvent* event) {
@@ -152,6 +204,7 @@ void Npc::process_game_event(GameEvent* event) {
 	{
 		auto damage_ev = cast_event<GameEventGetDamage>(event);
 		update_hp(-damage_ev->damage);
+		_target_player = damage_ev->sender;
 
 		auto [x, y] = get_position();
 		auto [sector_x, sector_y] = g_sector.get_sector_idx(x, y);
@@ -164,7 +217,7 @@ void Npc::process_game_event(GameEvent* event) {
 				continue;
 			}
 
-            client->send_attack_packet(_id);
+            client->send_stat_change_packet(_id);
 			if (_hp <= 0) {
 				client->send_leave_packet(_id);
 			}
@@ -173,25 +226,34 @@ void Npc::process_game_event(GameEvent* event) {
 		if (_hp <= 0) {
             update_active_state(false);
             g_sector.erase(_id, x, y);
-            g_server.add_timer_event(_id, 5s, OP_NPC_RESPAWN);
+            g_server.add_timer_event(_id, NPC_RESPAWN_TIME, OP_NPC_RESPAWN);
 			if (g_server.is_pc(damage_ev->sender)) {
 				auto player = g_server.get_server_object<Session>(damage_ev->sender);
 				if (nullptr == player) {
 					break;
 				}
 
-				player->dispatch_game_event<GameEventKillEnemy>(_id, 20);
+				player->dispatch_game_event<GameEventKillEnemy>(_id, 0s, _level * _level * 2);
 			}
 		}
 	}
     break;
+
+	case GameEventType::EVENT_KILL_ENEMY:
+	{
+		if (_target_player == event->sender) {
+			_target_player = SYSTEM_ID;
+			break;
+		}
+	}
+	break;
 
 	default:
 		break;
 	}
 }
 
-void Npc::dispatch_npc_update(IoType type) {
+void Npc::dispatch_npc_update(IoType type, void* extra_info) {
 	switch (type) {
 	case OP_NPC_MOVE:
 	{

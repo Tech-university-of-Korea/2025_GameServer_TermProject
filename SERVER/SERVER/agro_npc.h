@@ -2,18 +2,18 @@
 
 #include "Npc.h"
 
-class LuaNpc : public Npc {
+class AgroNpc : public Npc {
 public:
-    LuaNpc(int32_t id);
-    virtual ~LuaNpc();
+    AgroNpc(int32_t id);
+    virtual ~AgroNpc();
 
 public:
+    virtual void init_npc_name() override;
     bool initialize_lua_script();
 
     void process_event_player_move(int32_t target_obj);
     void process_event_npc_move();
-    virtual void process_game_event(GameEvent* event) override;
-    virtual void dispatch_npc_update(IoType type) override;
+    virtual void dispatch_npc_update(IoType type, void* extra_info) override;
 
 private:
     // LUA SCRIPT

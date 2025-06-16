@@ -17,12 +17,6 @@ constexpr char S2C_P_LEAVE = 4;
 constexpr char S2C_P_CHAT = 7;
 constexpr char S2C_P_STAT_CHANGE = 8;
 constexpr char S2C_P_LOGIN_FAIL = 9;
-constexpr char S2C_P_ATTACK = 10;
-constexpr char S2C_P_UPDATE_EXP = 11;
-constexpr char S2C_P_LEVEL_UP = 12;
-//constexpr char S2C_P_ENTER_PARTY = 11;
-//constexpr char S2C_P_LEAVE_PARTY = 12;
-//constexpr char S2C_P_UPDATE_PARTY_PLAYERS = 13;
 
 constexpr char C2S_P_LOGIN = 65;
 constexpr char C2S_P_MOVE = 66;
@@ -97,16 +91,11 @@ struct sc_packet_stat_change {
 	unsigned char size;
 	char type;
 	long long  id;
-	short hp;
+	int hp;
+	int max_hp;
 	short level;
 	int   exp;
-};
-
-struct sc_packet_attack {
-	unsigned char size;
-	char type;
-	long long id;
-	int hp;
+	int max_exp;
 };
 
 struct sc_packet_login_fail {
@@ -117,22 +106,6 @@ struct sc_packet_login_fail {
 							// 1 : 다른 클라이언트에서 사용중
 							// 2 : 부적절한 ID (특수문자, 20자 이상)
 							// 3 : 서버에 동접이 너무 많음
-};
-
-struct sc_packet_update_exp {
-	unsigned char size;
-	char type;
-	long long id;
-	int exp;
-};
-
-struct sc_packet_level_up {
-	unsigned char size;
-	char type;
-	long long id;
-	int exp;
-	int max_exp;
-	int level;
 };
 
 struct cs_packet_login {

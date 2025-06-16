@@ -56,7 +56,7 @@ void Object::draw() {
 		g_hp_bar->draw_hp_and_exp(20, 90.0f, m_hp, m_max_hp, m_exp, m_max_exp, 1.5f, false);
 	}
 	else {
-		g_hp_bar->draw_hp_bar(rx + 32, ry - 10, m_hp, m_max_hp, 0.5f);
+		g_hp_bar->draw_hp_bar(rx + 32, ry - 10, m_hp, m_max_hp, 1.0f);
 	}
 
 	if (MAX_USER <= m_id) {
