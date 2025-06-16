@@ -33,6 +33,9 @@ void process_packet(char* ptr)
 		avatar.m_id = g_myid;
 		avatar.m_hp = packet->hp;
 		avatar.m_max_hp = packet->max_hp;
+		avatar.m_level = packet->level;
+		avatar.m_exp = packet->exp;
+		avatar.m_max_exp = packet->max_exp;
 		avatar.move(packet->x, packet->y);
 		g_left_x = packet->x - SCREEN_WIDTH / 2;
 		g_top_y = packet->y - SCREEN_HEIGHT / 2;
@@ -137,9 +140,30 @@ void process_packet(char* ptr)
 	case S2C_P_LEVEL_UP:
 	{
 		sc_packet_level_up* packet = reinterpret_cast<sc_packet_level_up*>(ptr);
-		players[packet->id].m_level = packet->level;
-		players[packet->id].m_exp = packet->exp;
+		if (packet->id == g_myid) {
+			avatar.m_exp = packet->exp;
+			avatar.m_max_exp = packet->max_exp;
+			avatar.m_level = packet->level;
+		}
+		else {
+			players[packet->id].m_exp = packet->exp;
+			players[packet->id].m_max_exp = packet->max_exp;
+			players[packet->id].m_level = packet->level;
+		}
 	}
+	break;
+	
+	case S2C_P_UPDATE_EXP:
+	{
+		sc_packet_update_exp* packet = reinterpret_cast<sc_packet_update_exp*>(ptr);
+		if (packet->id == g_myid) {
+			avatar.m_exp = packet->exp;
+		}
+		else {
+			players[packet->id].m_exp = packet->exp;
+		}
+	}
+	break;
 
 	default:
 		printf("Unknown PACKET type [%d]\n", ptr[1]);

@@ -19,5 +19,5 @@ public:
     virtual void process_event_npc_move();
     virtual void process_game_event(GameEvent* event) override;
 
-    virtual void dispatch_npc_update(COMP_TYPE type);
+    virtual void dispatch_npc_update(IoType type);
 };

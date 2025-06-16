@@ -51,6 +51,7 @@ struct sc_packet_avatar_info {
 	short x, y;
 	short level;
 	int   exp;
+	int   max_exp;
 	int hp;
 	int max_hp;
 };

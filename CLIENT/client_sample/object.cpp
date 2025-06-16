@@ -46,13 +46,17 @@ void Object::draw() {
 	g_window->draw(m_sprite);
 
 	if (g_myid == m_id) {
-		g_hp_bar->draw_player_hp(20, 50, m_hp, m_max_hp, 4.0f, false);
-	}
-	else if (m_id < MAX_USER) {
-		g_hp_bar->draw_player_hp(rx + 32, ry - 10, m_hp, m_max_hp, 2.0f);
+		m_level_text.setFont(g_font);
+		m_level_text.setFillColor(sf::Color(255, 255, 0));
+		m_level_text.setStyle(sf::Text::Bold);
+		m_level_text.setString(std::format("Level. {}", m_level));
+		m_level_text.setPosition(40.0f, 50.0f);
+
+		g_window->draw(m_level_text);
+		g_hp_bar->draw_hp_and_exp(20, 90.0f, m_hp, m_max_hp, m_exp, m_max_exp, 1.5f, false);
 	}
 	else {
-		g_hp_bar->draw_enemy_hp(rx + 32, ry - 10, m_hp, m_max_hp, 2.0f);
+		g_hp_bar->draw_hp_bar(rx + 32, ry - 10, m_hp, m_max_hp, 0.5f);
 	}
 
 	if (MAX_USER <= m_id) {

@@ -36,7 +36,6 @@ void Session::process_game_event(GameEvent* event) {
 	{
 		auto kill_event = cast_event<GameEventKillEnemy>(event);
 		process_kill_enemy_event(kill_event);
-		std::cout << "Level UP!!!\n";
 	}
 	break;
 
@@ -52,7 +51,7 @@ void Session::process_game_event(GameEvent* event) {
 	}
 }
 
-void Session::process_recv(int32_t num_bytes, OverExp* ex_over) {
+void Session::process_recv(int32_t num_bytes, IoOver* ex_over) {
 	int32_t total_size = num_bytes + _prev_remain;
 	if (0 == total_size) return;
 	uint8_t* end = reinterpret_cast<uint8_t*>(ex_over->_send_buf) + total_size;
@@ -137,14 +136,26 @@ void Session::process_packet(unsigned char* packet) {
 }
 
 void Session::process_kill_enemy_event(const GameEventKillEnemy* const event) {
-	std::lock_guard exp_guard{ _level_lock };
 	auto max_exp = 100;
+	_level_lock.lock();
 	_exp += event->exp;
-	auto diff_exp = _exp - max_exp;
-	if (0 < diff_exp) {
-		_exp = diff_exp;
-		_level += 1;
+    auto curr_exp = _exp;
+	auto diff_exp = curr_exp - max_exp;
+	if (0 <= diff_exp) {
+		_exp = diff_exp % max_exp;
+		curr_exp = _exp;
+
+		_level += diff_exp / max_exp + 1;
+
+		auto curr_level = _level;
+		_level_lock.unlock();
+
+		send_level_up_packet(_id, curr_exp, max_exp, curr_level);
+		return;
 	}
+	_level_lock.unlock();
+
+	send_update_exp_packet(_id, curr_exp);
 }
 
 void Session::login(std::string_view name, const DB_USER_INFO& user_info) {
@@ -366,7 +377,7 @@ void Session::do_recv() {
 }
 
 void Session::do_send(void* packet) {
-	OverExp* sdata = new OverExp{ reinterpret_cast<char*>(packet) };
+	IoOver* sdata = new IoOver{ reinterpret_cast<char*>(packet) };
 	::WSASend(_socket, &sdata->_wsabuf, 1, 0, 0, &sdata->_over, 0);
 }
 
@@ -379,6 +390,9 @@ void Session::send_login_info_packet() {
 	p.y = _y;
 	p.hp = _hp;
 	p.max_hp = 100;
+	p.level = 1;
+	p.exp = 0;
+	p.max_exp = 100;
 	do_send(&p);
 }
 
@@ -486,4 +500,30 @@ void Session::send_attack_packet(int32_t target) {
 	attack_packet.hp = hp;
 
 	do_send(&attack_packet);
+}
+
+void Session::send_level_up_packet(int32_t client_id, int32_t exp, int32_t max_exp, int32_t level) {
+	sc_packet_level_up level_up_packet;
+	level_up_packet.id = client_id;
+	level_up_packet.size = sizeof(level_up_packet);
+	level_up_packet.type = S2C_P_LEVEL_UP;
+	level_up_packet.level = level;
+	level_up_packet.exp = exp;
+	level_up_packet.max_exp = max_exp;
+
+	do_send(&level_up_packet);
+}
+
+void Session::send_update_exp_packet(int32_t client_id, int32_t exp) {
+	if (client_id != _id) {
+		return;
+	}
+
+	sc_packet_update_exp update_exp_packet;
+	update_exp_packet.id = client_id;
+	update_exp_packet.size = sizeof(update_exp_packet);
+	update_exp_packet.type = S2C_P_UPDATE_EXP;
+	update_exp_packet.exp = exp;
+
+	do_send(&update_exp_packet);
 }

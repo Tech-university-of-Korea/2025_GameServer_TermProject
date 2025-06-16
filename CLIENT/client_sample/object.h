@@ -25,6 +25,7 @@ public:
 	int32_t m_hp{ };
 	int32_t m_max_hp{ };
 	int32_t m_exp{ };
+	int32_t m_max_exp{ 1 };
 	int32_t m_level{ };
 	char name[MAX_ID_LENGTH]{ };
 
@@ -33,6 +34,7 @@ private:
 	sf::Sprite m_sprite{ };
 
 	sf::Text m_name{ };
+	sf::Text m_level_text{ };
 	sf::Text m_chat{ };
 	std::chrono::system_clock::time_point m_mess_end_time{ };
 };

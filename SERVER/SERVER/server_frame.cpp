@@ -56,7 +56,7 @@ void ServerFrame::disconnect(int32_t client_id) {
 	_sessions.at(client_id) = nullptr;
 }
 
-void ServerFrame::add_timer_event(int32_t id, std::chrono::system_clock::duration delay, COMP_TYPE type, void* extra_info) {
+void ServerFrame::add_timer_event(int32_t id, std::chrono::system_clock::duration delay, IoType type, void* extra_info) {
 	auto excute_time = std::chrono::system_clock::now() + delay;
 	TimerEvent ev{ id, type, extra_info };
 	auto insert_pair = std::make_pair(excute_time, ev);
@@ -243,13 +243,14 @@ void ServerFrame::worker_thread() {
 
 		case OP_RECV: 
 		{
+			auto io_over = reinterpret_cast<IoOver*>(ex_over);
 			int32_t client_id = static_cast<int32_t>(key);
 			auto session = get_server_object<Session>(client_id);
 			if (nullptr == session) {
 				break;
 			}
 
-			session->process_recv(num_bytes, ex_over);
+			session->process_recv(num_bytes, io_over);
 			session->do_recv();
 		}
         break;

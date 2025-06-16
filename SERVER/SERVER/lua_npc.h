@@ -13,7 +13,7 @@ public:
     void process_event_player_move(int32_t target_obj);
     void process_event_npc_move();
     virtual void process_game_event(GameEvent* event) override;
-    virtual void dispatch_npc_update(COMP_TYPE type) override;
+    virtual void dispatch_npc_update(IoType type) override;
 
 private:
     // LUA SCRIPT

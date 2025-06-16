@@ -180,7 +180,7 @@ void Npc::process_game_event(GameEvent* event) {
 					break;
 				}
 
-				player->dispatch_game_event<GameEventKillEnemy>(_id, 100);
+				player->dispatch_game_event<GameEventKillEnemy>(_id, 20);
 			}
 		}
 	}
@@ -191,7 +191,7 @@ void Npc::process_game_event(GameEvent* event) {
 	}
 }
 
-void Npc::dispatch_npc_update(COMP_TYPE type) {
+void Npc::dispatch_npc_update(IoType type) {
 	switch (type) {
 	case OP_NPC_MOVE:
 	{

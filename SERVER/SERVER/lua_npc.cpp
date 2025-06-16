@@ -54,7 +54,7 @@ void LuaNpc::process_event_npc_move() {
 void LuaNpc::process_game_event(GameEvent* event) {
 }
 
-void LuaNpc::dispatch_npc_update(COMP_TYPE type) {
+void LuaNpc::dispatch_npc_update(IoType type) {
 	//process_event_player_move();
 }
 

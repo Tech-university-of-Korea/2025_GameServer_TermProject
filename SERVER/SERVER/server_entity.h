@@ -80,8 +80,8 @@ protected:
     char _name[MAX_ID_LENGTH]{ };
     int16_t _x{ 0 };
     int16_t _y{ 0 };
-    volatile uint32_t _level{ 1 };
-    volatile uint32_t _exp{ 0 };
+    volatile int32_t _level{ 1 };
+    volatile int32_t _exp{ 0 };
     std::atomic_int32_t _hp{ 100 };
 
     // NETWORK

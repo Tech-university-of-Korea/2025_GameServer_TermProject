@@ -18,7 +18,7 @@ public:
     virtual bool try_respawn(int32_t max_hp) override;
     virtual void process_game_event(GameEvent* event) override;
 
-    void process_recv(int32_t num_bytes, OverExp* ex_over);
+    void process_recv(int32_t num_bytes, IoOver* ex_over);
     void process_packet(unsigned char* packet);
 
     void process_kill_enemy_event(const GameEventKillEnemy* const);
@@ -42,11 +42,13 @@ public:
 	void send_chat_packet(int32_t client_id, const char* mess);
     void send_leave_packet(int32_t client_id);
     void send_attack_packet(int32_t target);
+    void send_level_up_packet(int32_t client_id, int32_t exp, int32_t max_exp, int32_t level);
+    void send_update_exp_packet(int32_t client_id, int32_t exp);
 
 private:
     // NETWORK 
 	SOCKET _socket{ INVALID_SOCKET };
-	OverExp _recv_over{ };
+    IoOver _recv_over{ };
 	int32_t _prev_remain{ };
     
     // VIEW

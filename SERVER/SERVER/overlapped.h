@@ -1,6 +1,6 @@
 #pragma once
 
-enum COMP_TYPE : int32_t {
+enum IoType : int32_t {
 	// OP_IO
 	OP_ACCEPT = 0x00, 
 	OP_RECV, 
@@ -16,18 +16,21 @@ enum COMP_TYPE : int32_t {
 struct OverExp {
 	WSAOVERLAPPED _over;
 	WSABUF _wsabuf;
-	char _send_buf[BUF_SIZE]{ };
-	COMP_TYPE _comp_type;
+	IoType _comp_type;
 	void* extra_info;
+};
 
-	OverExp() {
+struct IoOver : public OverExp {
+	char _send_buf[BUF_SIZE]{ };
+
+	IoOver() {
 		_wsabuf.len = BUF_SIZE;
 		_wsabuf.buf = _send_buf;
 		_comp_type = OP_RECV;
 		::memset(&_over, 0, sizeof(_over));
 	}
 
-	OverExp(char* packet) {
+	IoOver(char* packet) {
 		auto size = static_cast<unsigned char>(packet[0]);
 		_wsabuf.len = size;
 		_wsabuf.buf = _send_buf;
