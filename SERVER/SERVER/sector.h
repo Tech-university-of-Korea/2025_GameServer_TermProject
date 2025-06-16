@@ -6,7 +6,7 @@
 #include <array>
 #include "game_header.h"
 
-inline constexpr int VIEW_RANGE = 7;
+inline constexpr int VIEW_RANGE = 10;
 
 inline constexpr auto VIEW_DIAM = VIEW_RANGE * 2;
 inline constexpr auto SECTOR_WIDTH = (MAP_WIDTH / VIEW_DIAM) + 1;

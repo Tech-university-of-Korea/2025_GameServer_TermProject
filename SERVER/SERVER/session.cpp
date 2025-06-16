@@ -126,7 +126,7 @@ void Session::process_packet(unsigned char* packet) {
 	case C2S_P_LOGIN: {
 		cs_packet_login* p = reinterpret_cast<cs_packet_login*>(packet);
 		if (g_server.is_dummy_client(p->name)) {
-			DbUserInfo user_info{ rand() % MAP_WIDTH, rand() % MAP_HEIGHT };
+			DbUserInfo user_info{ rand() % MAP_WIDTH, rand() % MAP_HEIGHT, 0, rand() % 10 };
 			init_name(p->name);
 			login(user_info);
 			break;

@@ -158,7 +158,7 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="npc.lua">
+    <None Include="agro_npc.lua">
       <Filter>lua_script</Filter>
     </None>
   </ItemGroup>

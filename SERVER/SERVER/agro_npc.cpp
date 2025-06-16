@@ -89,7 +89,7 @@ bool AgroNpc::initialize_lua_script() {
 	lua_register(_lua_state, "API_get_x", API_get_x);
 	lua_register(_lua_state, "API_get_y", API_get_y);
 
-	if (LUA_OK != luaL_loadfile(_lua_state, "npc.lua") or LUA_OK != lua_pcall(_lua_state, 0, 0, 0)) {
+	if (LUA_OK != luaL_loadfile(_lua_state, "agro_npc.lua") or LUA_OK != lua_pcall(_lua_state, 0, 0, 0)) {
 		std::cout << lua_tostring(_lua_state, -1) << "\n";
 		lua_pop(_lua_state, 1);
 		return false;

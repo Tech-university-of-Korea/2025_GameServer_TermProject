@@ -151,9 +151,6 @@ void ProcessPacket(int ci, unsigned char packet[])
 	case S2C_P_ENTER: break;
 	case S2C_P_LEAVE: break;
 	case S2C_P_CHAT: break;
-	case S2C_P_LEVEL_UP: break;
-	case S2C_P_UPDATE_EXP: break;
-	case S2C_P_ATTACK: break;
 	case S2C_P_STAT_CHANGE: break;
 	case S2C_P_LOGIN_FAIL:
 	{

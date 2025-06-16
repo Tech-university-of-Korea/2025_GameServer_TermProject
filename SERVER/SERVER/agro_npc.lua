@@ -12,7 +12,17 @@ end
 
 function event_player_move(player)
     player_x = API_get_x(player);
+    if (-1 == player_x) then
+        target_player_id = -1;
+        return target_player_id;
+    end
+
     player_y = API_get_y(player);
+    if (-1 == player_y) then
+        target_player_id = -1;
+        return target_player_id;
+    end
+
     my_x = API_get_x(myid);
     my_y = API_get_y(myid);
     if (math.abs(player_x - my_x) < agro_range) then

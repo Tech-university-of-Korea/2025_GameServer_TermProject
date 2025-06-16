@@ -6,7 +6,7 @@
 
 #include "utils.h"
 
-#define DEBUG_PRINT
+//#define DEBUG_PRINT
 
 using ThreadIdType = int32_t;
 using EpochNumType = uint64_t;

@@ -8,7 +8,8 @@ int32_t API_get_x(lua_State* L)
 
 	auto client = g_server.get_server_object(user_id);
 	if (nullptr == client) {
-		return 0;
+		lua_pushnumber(L, -1);
+		return 1;
 	}
 
 	int32_t x = client->get_x();
@@ -23,7 +24,8 @@ int32_t API_get_y(lua_State* L)
 
 	auto client = g_server.get_server_object(user_id);
 	if (nullptr == client) {
-		return 0;
+		lua_pushnumber(L, -1);
+		return 1;
 	}
 
 	int y = client->get_y();
