@@ -58,8 +58,11 @@ void ServerFrame::disconnect(int32_t client_id) {
 
 void ServerFrame::add_timer_event(int32_t id, std::chrono::system_clock::duration delay, COMP_TYPE type, void* extra_info) {
 	auto excute_time = std::chrono::system_clock::now() + delay;
-	TimerEvent ev{ id, excute_time, type, extra_info };
-	_timer_queue.push(ev);
+	TimerEvent ev{ id, type, extra_info };
+	auto insert_pair = std::make_pair(excute_time, ev);
+
+	std::lock_guard timer_map_guard{ _timer_map_lock };
+	_timer_event_map.insert(insert_pair);
 }
 
 void ServerFrame::wakeup_npc(int32_t npc_id, int32_t waker) {
@@ -332,24 +335,38 @@ void ServerFrame::timer_thread() {
 	init_tls();
 
 	while (true) {
-		TimerEvent ev;
 		auto current_time = std::chrono::system_clock::now();
-		if (false == _timer_queue.try_pop(ev)) {
-            std::this_thread::sleep_for(1ms);
+		_timer_map_lock.lock();
+		if (_timer_event_map.empty()) {
+			_timer_map_lock.unlock();
+			std::this_thread::sleep_for(1ms);
 			continue;
 		}
 
-        if (ev.wakeup_time > current_time) {
-            _timer_queue.push(ev);
+		auto beg = _timer_event_map.begin();
+		auto end = _timer_event_map.upper_bound(current_time);
+		size_t executable_cnt = std::distance(beg, end);
+		if (0 == executable_cnt) {
+			_timer_map_lock.unlock();
+			std::this_thread::sleep_for(1ms);
+			continue;
+		}
 
-            std::this_thread::sleep_for(1ms);
-            continue;
-        }
+		std::vector<TimerEvent> ev_vec;
+		ev_vec.reserve(executable_cnt);
 
-        OverExp* ov = new OverExp;
-		ov->_comp_type = ev.op_type;
-		ov->extra_info = ev.extra_info;
-        ::PostQueuedCompletionStatus(_iocp_handle, 1, ev.obj_id, &ov->_over);
+		std::transform(beg, end, std::back_inserter(ev_vec), [](const auto& pair) { return pair.second; }); // 순회를 위한 벡터에 저장
+		_timer_event_map.erase(beg, end);
+		_timer_map_lock.unlock(); // 더이상의 보호는 불필요
+
+		for (auto& ev : ev_vec) { // 실행할 수 있는건 모두 실행
+			OverExp* ov = new OverExp;
+			ov->_comp_type = ev.op_type;
+			ov->extra_info = ev.extra_info;
+			::PostQueuedCompletionStatus(_iocp_handle, 1, ev.obj_id, &ov->_over);
+		}
+
+		std::this_thread::sleep_for(1ms); 
 	}
 
 	finish_thread();
@@ -357,6 +374,5 @@ void ServerFrame::timer_thread() {
 
 void ServerFrame::db_thread() {
 	while (true) {
-
 	}
 }

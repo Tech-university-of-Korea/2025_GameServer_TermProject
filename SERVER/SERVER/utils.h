@@ -2,7 +2,6 @@
 
 #include "session.h"
 #include "npc.h" 
-#include "server_object_tags.h"
 #include "lua_npc.h"
 
 #include <concepts>
@@ -27,7 +26,8 @@ struct GetObjectTag<LuaNpc> {
 
 // Util - casting
 template <typename T> requires std::derived_from<T, ServerObject>
-inline T* cast_ptr(ServerObject* obj) {
+inline T* cast_ptr(ServerObject* obj) 
+{
     if (nullptr == obj) {
         return nullptr;
     }

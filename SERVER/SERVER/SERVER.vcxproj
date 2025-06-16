@@ -177,7 +177,6 @@
     <ClInclude Include="sector.h" />
     <ClInclude Include="server_entity.h" />
     <ClInclude Include="server_frame.h" />
-    <ClInclude Include="server_object_tags.h" />
     <ClInclude Include="session.h" />
     <ClInclude Include="session_ebr.h" />
     <ClInclude Include="thread_utils.h" />

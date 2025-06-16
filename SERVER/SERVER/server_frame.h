@@ -4,6 +4,8 @@
 #include "lua_npc.h"
 #include "overlapped.h"
 
+#include <map>
+
 using SessionPtr = Session*;
 
 enum DB_EVENT_TYPE { 
@@ -13,16 +15,11 @@ enum DB_EVENT_TYPE {
 
 struct TimerEvent {
     int32_t obj_id;
-    std::chrono::system_clock::time_point wakeup_time;
     COMP_TYPE op_type;
     void* extra_info;
-
-    constexpr bool operator<(const TimerEvent& other) const {
-        return wakeup_time > other.wakeup_time;
-    }
 };
 
-struct DB_EVENT {
+struct DataBaseEvent {
     int32_t id;
     DB_EVENT_TYPE event;
 };
@@ -77,7 +74,8 @@ private:
     std::atomic_int32_t _new_client_id{ 0 };
     Concurrency::concurrent_unordered_map<int32_t, ServerObject*> _sessions{ };
 
-    std::mutex _timer_queue_lock{ };
-    concurrency::concurrent_priority_queue<TimerEvent> _timer_queue;
-    //concurrency::concurrent_queue<DB_EVENT> _db_queue;
+    std::mutex _timer_map_lock;
+    std::multimap<std::chrono::system_clock::time_point, TimerEvent> _timer_event_map;
+
+    concurrency::concurrent_queue<DataBaseEvent> _db_queue;
 };

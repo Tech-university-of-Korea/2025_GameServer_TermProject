@@ -123,9 +123,6 @@
     <ClInclude Include="lua_api.h">
       <Filter>lua_script</Filter>
     </ClInclude>
-    <ClInclude Include="server_object_tags.h">
-      <Filter>utils</Filter>
-    </ClInclude>
     <ClInclude Include="overlapped.h">
       <Filter>utils</Filter>
     </ClInclude>
