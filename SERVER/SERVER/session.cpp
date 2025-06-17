@@ -85,6 +85,7 @@ void Session::process_game_event(GameEvent* event) {
 	{
 		auto heal_ev = cast_event<GameEventHeal>(event);
 		update_hp(heal_ev->heal_point);
+		send_chat_packet(SYSTEM_ID, std::format("Auto-recovery: +{} HP", heal_ev->heal_point).c_str());
 		dispatch_game_event<GameEventHeal>(_id, 5s, _level * 5);
 	}
 	break;

@@ -193,7 +193,7 @@ int main()
 					direction = 1;
 					break;
 
-				case sf::Keyboard::LControl:
+				case sf::Keyboard::A:
 				{
 					cs_packet_attack p;
 					p.size = sizeof(p);
